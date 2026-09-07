@@ -39,7 +39,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
           <span className="sidebar-logo-chip">
             <img src={logo} alt="Azul Tech" className="sidebar-logo" />
           </span>
-          {!collapsed && <span className="sidebar-logo-suffix">HR System</span>}
+          {!collapsed && <span className="sidebar-logo-suffix">People</span>}
         </div>
 
         <nav className="sidebar-nav">

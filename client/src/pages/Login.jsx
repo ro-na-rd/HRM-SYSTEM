@@ -35,7 +35,7 @@ export default function Login() {
         <span className="brand-logo-chip">
           <img src={logo} alt="Azul Tech" />
         </span>
-        <span className="brand-suffix">HR System</span>
+        <span className="brand-suffix">People</span>
       </div>
 
       <form className="login-glass-card" onSubmit={handleSubmit}>
@@ -43,7 +43,7 @@ export default function Login() {
           <span className="brand-logo-chip brand-logo-chip-lg">
             <img src={logo} alt="Azul Tech" />
           </span>
-          <p className="subtitle">HR Management System</p>
+          <p className="subtitle">People Management System</p>
         </div>
 
         {error && <div className="error-banner error-banner-dark">{error}</div>}
