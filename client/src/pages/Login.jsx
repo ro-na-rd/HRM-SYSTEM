@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import logo from '../assets/azul-tech-logo.png';
+import logo from '../assets/azul-tech-logo-white.png';
 import { MailIcon, LockIcon } from '../components/Icons';
 
 export default function Login() {
