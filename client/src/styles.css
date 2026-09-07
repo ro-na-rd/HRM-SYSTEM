@@ -75,7 +75,7 @@ body {
   height: 30px;
   padding: 4px 9px;
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--primary);
   flex-shrink: 0;
 }
 
@@ -1131,7 +1131,7 @@ select {
   height: 32px;
   padding: 4px 10px;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--primary);
 }
 
 .brand-logo-chip img {
