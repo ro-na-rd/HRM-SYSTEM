@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import logo from '../assets/azul-tech-logo-white.png';
+import logo from '../assets/azul-tech-logo-white-transparent.png';
 import {
   DashboardIcon,
   EmployeesIcon,
