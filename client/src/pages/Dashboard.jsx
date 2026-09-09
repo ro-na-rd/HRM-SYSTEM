@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import Layout from '../components/Layout';
 import { useAuth } from '../AuthContext';
 import { DonutChart, TrendChart } from '../components/Charts';
+import Avatar from '../components/Avatar';
 import { timeAgo } from '../utils/timeAgo';
 import { EmployeesIcon, OrganizationIcon, DocumentsIcon, SettingsIcon } from '../components/Icons';
 
@@ -215,7 +216,7 @@ export default function Dashboard() {
           <ul className="people-list">
             {recentHires.map((e) => (
               <li key={e.id}>
-                <span className="avatar-circle">{e.full_name[0].toUpperCase()}</span>
+                <Avatar id={e.id} name={e.full_name} hasPhoto={e.has_photo} size={30} />
                 <div className="people-list-info">
                   <strong>{e.full_name}</strong>
                   <span>{e.position || e.department || '—'}</span>
