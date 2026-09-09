@@ -191,10 +191,6 @@ body {
   margin-left: var(--sidebar-collapsed-width);
 }
 
-.app-main-no-sidebar {
-  margin-left: 0;
-}
-
 .topheader {
   position: sticky;
   top: 0;

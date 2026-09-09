@@ -144,6 +144,22 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/profile/leave"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/letters"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

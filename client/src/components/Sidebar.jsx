@@ -13,6 +13,8 @@ import {
   ReportsIcon,
   SettingsIcon,
   ChevronLeftIcon,
+  ProfileIcon,
+  MailIcon,
 } from './Icons';
 
 const NAV_ITEMS = [
@@ -28,8 +30,17 @@ const NAV_ITEMS = [
   { to: '/reports', label: 'Reports', icon: ReportsIcon },
 ];
 
+// Employee accounts only ever have their own profile, leave requests, and
+// letters to navigate between - not the full staff navigation above.
+const EMPLOYEE_NAV_ITEMS = [
+  { to: '/profile', label: 'My Profile', icon: ProfileIcon, end: true },
+  { to: '/profile/leave', label: 'Leave', icon: LeaveIcon },
+  { to: '/profile/letters', label: 'Letters', icon: MailIcon },
+];
+
 export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile, role }) {
   const showAdminItems = role === 'admin';
+  const navItems = role === 'employee' ? EMPLOYEE_NAV_ITEMS : NAV_ITEMS;
 
   return (
     <>
@@ -43,10 +54,11 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
+              end={end}
               className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
               onClick={onCloseMobile}
               title={collapsed ? label : undefined}
