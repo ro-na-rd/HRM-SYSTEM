@@ -18,8 +18,9 @@ router.get('/', (req, res) => {
   if (req.user.role === 'admin' || req.user.role === 'hr') {
     const rows = db
       .prepare(
-        `SELECT lr.*, e.full_name AS employee_name
+        `SELECT lr.*, e.full_name AS employee_name, r.name AS reviewed_by_name
          FROM leave_requests lr JOIN employees e ON e.id = lr.employee_id
+                                 LEFT JOIN users r ON r.id = lr.reviewed_by
          ORDER BY lr.created_at DESC`
       )
       .all();
@@ -29,7 +30,11 @@ router.get('/', (req, res) => {
   const employeeId = findOwnEmployeeId(req.user.id);
   if (!employeeId) return res.json([]);
   const rows = db
-    .prepare('SELECT * FROM leave_requests WHERE employee_id = ? ORDER BY created_at DESC')
+    .prepare(
+      `SELECT lr.*, r.name AS reviewed_by_name
+       FROM leave_requests lr LEFT JOIN users r ON r.id = lr.reviewed_by
+       WHERE lr.employee_id = ? ORDER BY lr.created_at DESC`
+    )
     .all(employeeId);
   res.json(rows);
 });

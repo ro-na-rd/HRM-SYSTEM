@@ -138,4 +138,19 @@ if (!employeeColumns.includes('manager_id')) {
   db.exec(`ALTER TABLE employees ADD COLUMN manager_id INTEGER REFERENCES employees(id) ON DELETE SET NULL;`);
 }
 
+// Migration: extra personal info for the employee's own Profile page.
+// date_of_birth/gender/address/emergency_contact_* are employee-editable
+// (personal info); everything else about the employee record stays
+// HR-controlled as before.
+if (!employeeColumns.includes('date_of_birth')) {
+  db.exec(`
+    ALTER TABLE employees ADD COLUMN date_of_birth TEXT;
+    ALTER TABLE employees ADD COLUMN gender TEXT;
+    ALTER TABLE employees ADD COLUMN address TEXT;
+    ALTER TABLE employees ADD COLUMN emergency_contact_name TEXT;
+    ALTER TABLE employees ADD COLUMN emergency_contact_relationship TEXT;
+    ALTER TABLE employees ADD COLUMN emergency_contact_phone TEXT;
+  `);
+}
+
 module.exports = db;

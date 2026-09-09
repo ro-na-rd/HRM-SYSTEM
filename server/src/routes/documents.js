@@ -3,7 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { z } = require('zod');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
@@ -19,11 +18,24 @@ const upload = multer({
 
 const CATEGORIES = ['contract', 'id_document', 'letter', 'certificate', 'other'];
 
-// Every document route is Admin/HR only — employees never reach this router.
-router.use(requireAuth, requireRole('admin', 'hr'));
+// Categories an employee may upload for themselves - things they'd submit
+// (an ID scan, a certificate). Contracts and letters are HR-issued records,
+// so only Admin/HR can add those, even to an employee's own file.
+const EMPLOYEE_UPLOADABLE_CATEGORIES = ['id_document', 'certificate', 'other'];
 
-// Company-wide document list (all employees), for the top-level Documents page.
-router.get('/', (req, res) => {
+router.use(requireAuth);
+
+function findOwnEmployeeId(userId) {
+  const employee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
+  return employee ? employee.id : null;
+}
+
+function isStaff(req) {
+  return req.user.role === 'admin' || req.user.role === 'hr';
+}
+
+// Company-wide document list (all employees) - Admin/HR only.
+router.get('/', requireRole('admin', 'hr'), (req, res) => {
   const docs = db
     .prepare(
       `SELECT d.id, d.employee_id, e.full_name AS employee_name, d.category, d.original_filename,
@@ -36,8 +48,12 @@ router.get('/', (req, res) => {
   res.json(docs);
 });
 
+// Admin/HR can see any employee's documents; an employee can only see their own.
 router.get('/employee/:employeeId', (req, res) => {
   const employeeId = Number(req.params.employeeId);
+  if (!isStaff(req) && findOwnEmployeeId(req.user.id) !== employeeId) {
+    return res.status(403).json({ error: 'You do not have permission to view these documents' });
+  }
   const docs = db
     .prepare(
       `SELECT id, employee_id, uploaded_by, category, original_filename, mime_type, size, created_at
@@ -52,11 +68,21 @@ router.post('/employee/:employeeId', upload.single('file'), (req, res) => {
   const employee = db.prepare('SELECT id FROM employees WHERE id = ?').get(employeeId);
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
 
+  const staff = isStaff(req);
+  if (!staff && findOwnEmployeeId(req.user.id) !== employeeId) {
+    return res.status(403).json({ error: 'You do not have permission to upload here' });
+  }
+
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
   const category = req.body.category;
-  if (!CATEGORIES.includes(category)) {
-    return res.status(400).json({ error: `Category must be one of: ${CATEGORIES.join(', ')}` });
+  const allowedCategories = staff ? CATEGORIES : EMPLOYEE_UPLOADABLE_CATEGORIES;
+  if (!allowedCategories.includes(category)) {
+    return res.status(400).json({
+      error: staff
+        ? `Category must be one of: ${CATEGORIES.join(', ')}`
+        : `You can only upload: ${EMPLOYEE_UPLOADABLE_CATEGORIES.join(', ')}. Ask HR to add a ${category}.`,
+    });
   }
 
   const { ciphertext, iv, authTag } = encryptBuffer(req.file.buffer);
@@ -96,22 +122,31 @@ router.post('/employee/:employeeId', upload.single('file'), (req, res) => {
   });
 });
 
-router.get('/:id/download', (req, res) => {
+function streamDocument(req, res, disposition) {
   const id = Number(req.params.id);
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
   if (!doc) return res.status(404).json({ error: 'Document not found' });
 
+  if (!isStaff(req) && findOwnEmployeeId(req.user.id) !== doc.employee_id) {
+    return res.status(403).json({ error: 'You do not have permission to view this document' });
+  }
+
   const ciphertext = fs.readFileSync(path.join(storageDir, doc.stored_filename));
   const plain = decryptBuffer(ciphertext, doc.iv, doc.auth_tag);
 
-  writeAuditLog(req.user.id, 'document_downloaded', 'document', id, { employeeId: doc.employee_id });
+  writeAuditLog(req.user.id, disposition === 'inline' ? 'document_viewed' : 'document_downloaded', 'document', id, {
+    employeeId: doc.employee_id,
+  });
 
   res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.original_filename)}"`);
+  res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(doc.original_filename)}"`);
   res.send(plain);
-});
+}
 
-router.delete('/:id', (req, res) => {
+router.get('/:id/download', (req, res) => streamDocument(req, res, 'attachment'));
+router.get('/:id/view', (req, res) => streamDocument(req, res, 'inline'));
+
+router.delete('/:id', requireRole('admin', 'hr'), (req, res) => {
   const id = Number(req.params.id);
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
   if (!doc) return res.status(404).json({ error: 'Document not found' });

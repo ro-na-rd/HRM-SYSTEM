@@ -24,7 +24,12 @@ router.use(requireAuth);
 // auth tag for the photo (internal storage details, not needed by the UI).
 // has_photo lets the frontend know whether to request /:id/photo at all.
 const SAFE_COLUMNS = `id, full_name, department, position, hire_date, phone, notes, user_id, manager_id, active,
-  created_at, (photo_stored_filename IS NOT NULL) AS has_photo`;
+  created_at, date_of_birth, gender, address, emergency_contact_name, emergency_contact_relationship,
+  emergency_contact_phone, (photo_stored_filename IS NOT NULL) AS has_photo`;
+const SAFE_COLUMNS_PREFIXED = `e.id, e.full_name, e.department, e.position, e.hire_date, e.phone, e.notes, e.user_id,
+  e.manager_id, e.active, e.created_at, e.date_of_birth, e.gender, e.address, e.emergency_contact_name,
+  e.emergency_contact_relationship, e.emergency_contact_phone,
+  (e.photo_stored_filename IS NOT NULL) AS has_photo, m.full_name AS manager_name`;
 
 function findOwnEmployeeId(userId) {
   const employee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
@@ -34,10 +39,20 @@ function findOwnEmployeeId(userId) {
 // Admin/HR see the full roster. Employees may only see their own linked record.
 router.get('/', (req, res) => {
   if (req.user.role === 'employee') {
-    const own = db.prepare(`SELECT ${SAFE_COLUMNS} FROM employees WHERE user_id = ?`).all(req.user.id);
+    const own = db
+      .prepare(
+        `SELECT ${SAFE_COLUMNS_PREFIXED} FROM employees e LEFT JOIN employees m ON m.id = e.manager_id
+         WHERE e.user_id = ?`
+      )
+      .all(req.user.id);
     return res.json(own);
   }
-  const employees = db.prepare(`SELECT ${SAFE_COLUMNS} FROM employees ORDER BY full_name ASC`).all();
+  const employees = db
+    .prepare(
+      `SELECT ${SAFE_COLUMNS_PREFIXED} FROM employees e LEFT JOIN employees m ON m.id = e.manager_id
+       ORDER BY e.full_name ASC`
+    )
+    .all();
   res.json(employees);
 });
 
@@ -46,7 +61,9 @@ router.get('/:id', (req, res) => {
   const employee = db
     .prepare(
       `SELECT e.id, e.full_name, e.department, e.position, e.hire_date, e.phone, e.notes, e.user_id, e.manager_id,
-              e.active, e.created_at, (e.photo_stored_filename IS NOT NULL) AS has_photo,
+              e.active, e.created_at, e.date_of_birth, e.gender, e.address, e.emergency_contact_name,
+              e.emergency_contact_relationship, e.emergency_contact_phone,
+              (e.photo_stored_filename IS NOT NULL) AS has_photo,
               u.name AS linked_user_name, u.email AS linked_user_email,
               m.full_name AS manager_name
        FROM employees e LEFT JOIN users u ON u.id = e.user_id
@@ -71,6 +88,12 @@ const employeeSchema = z.object({
   notes: z.string().optional().nullable(),
   user_id: z.number().int().optional().nullable(),
   manager_id: z.number().int().optional().nullable(),
+  date_of_birth: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  emergency_contact_name: z.string().optional().nullable(),
+  emergency_contact_relationship: z.string().optional().nullable(),
+  emergency_contact_phone: z.string().optional().nullable(),
 });
 
 // Walks up the proposed manager chain to make sure assigning managerId to
@@ -89,13 +112,20 @@ function wouldCreateManagerCycle(employeeId, managerId) {
   return false;
 }
 
-// Employee self-service: they may update their own phone number only.
-// Everything else (name, department, position, hire date, notes, linked
-// login) stays an official record that only Admin/HR can change.
+// Employee self-service: personal info only (phone, DOB, gender, address,
+// emergency contact). Employment info (name, department, position, hire
+// date, manager, notes, linked login) stays an official record that only
+// Admin/HR can change.
 // This must be registered before the '/:id' routes below, otherwise
 // Express would match "me" as an :id value instead.
 const selfUpdateSchema = z.object({
   phone: z.string().optional().nullable(),
+  date_of_birth: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  emergency_contact_name: z.string().optional().nullable(),
+  emergency_contact_relationship: z.string().optional().nullable(),
+  emergency_contact_phone: z.string().optional().nullable(),
 });
 
 router.patch('/me', (req, res) => {
@@ -108,9 +138,23 @@ router.patch('/me', (req, res) => {
 
   const parsed = selfUpdateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const d = parsed.data;
 
-  db.prepare('UPDATE employees SET phone = ? WHERE id = ?').run(parsed.data.phone ?? null, employeeId);
-  writeAuditLog(req.user.id, 'employee_self_updated', 'employee', employeeId, { fields: ['phone'] });
+  db.prepare(
+    `UPDATE employees SET phone = ?, date_of_birth = ?, gender = ?, address = ?,
+       emergency_contact_name = ?, emergency_contact_relationship = ?, emergency_contact_phone = ?
+     WHERE id = ?`
+  ).run(
+    d.phone ?? null,
+    d.date_of_birth ?? null,
+    d.gender ?? null,
+    d.address ?? null,
+    d.emergency_contact_name ?? null,
+    d.emergency_contact_relationship ?? null,
+    d.emergency_contact_phone ?? null,
+    employeeId
+  );
+  writeAuditLog(req.user.id, 'employee_self_updated', 'employee', employeeId, { fields: Object.keys(d) });
   res.json(db.prepare(`SELECT ${SAFE_COLUMNS} FROM employees WHERE id = ?`).get(employeeId));
 });
 
@@ -156,7 +200,9 @@ router.patch('/:id', requireRole('admin', 'hr'), (req, res) => {
   }
 
   db.prepare(
-    `UPDATE employees SET full_name = ?, department = ?, position = ?, hire_date = ?, phone = ?, notes = ?, user_id = ?, manager_id = ?
+    `UPDATE employees SET full_name = ?, department = ?, position = ?, hire_date = ?, phone = ?, notes = ?, user_id = ?,
+       manager_id = ?, date_of_birth = ?, gender = ?, address = ?, emergency_contact_name = ?,
+       emergency_contact_relationship = ?, emergency_contact_phone = ?
      WHERE id = ?`
   ).run(
     merged.full_name,
@@ -167,6 +213,12 @@ router.patch('/:id', requireRole('admin', 'hr'), (req, res) => {
     merged.notes,
     merged.user_id,
     merged.manager_id,
+    merged.date_of_birth,
+    merged.gender,
+    merged.address,
+    merged.emergency_contact_name,
+    merged.emergency_contact_relationship,
+    merged.emergency_contact_phone,
     id
   );
 
