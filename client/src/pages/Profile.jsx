@@ -3,22 +3,21 @@ import { api } from '../api/client';
 import Layout from '../components/Layout';
 import { useAuth } from '../AuthContext';
 
-export default function Profile() {
+const LEAVE_TYPE_LABELS = {
+  annual: 'Annual',
+  sick: 'Sick',
+  unpaid: 'Unpaid',
+  other: 'Other',
+};
+
+function StatusBadge({ status }) {
+  return <span className={`status-badge status-${status}`}>{status[0].toUpperCase() + status.slice(1)}</span>;
+}
+
+function ProfilePanel({ employee }) {
   const { user } = useAuth();
-  const [employee, setEmployee] = useState(null);
-
-  useEffect(() => {
-    api
-      .get('/employees')
-      .then((rows) => setEmployee(rows[0] || null))
-      .catch(() => setEmployee(null));
-  }, []);
-
   return (
-    <Layout>
-      <div className="page-header">
-        <h2>My Profile</h2>
-      </div>
+    <>
       <div className="card employee-summary">
         <div>
           <strong>Name:</strong> {user?.name}
@@ -41,6 +40,244 @@ export default function Profile() {
         Document records (contracts, ID, letters, etc.) are managed by HR and are not accessible from employee
         accounts. Please contact HR if you need a copy of a document.
       </p>
+    </>
+  );
+}
+
+function LeavePanel({ hasEmployeeRecord }) {
+  const [rows, setRows] = useState([]);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ type: 'annual', start_date: '', end_date: '', reason: '' });
+
+  function load() {
+    api.get('/leave').then(setRows).catch((e) => setError(e.message));
+  }
+
+  useEffect(load, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      await api.post('/leave', form);
+      setForm({ type: 'annual', start_date: '', end_date: '', reason: '' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!hasEmployeeRecord) {
+    return (
+      <p className="hint">
+        Your login isn’t linked to an employee record yet, so you can’t request leave. Ask your Admin to link your
+        account.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {error && <div className="error-banner">{error}</div>}
+      <form className="card form-grid" onSubmit={handleSubmit}>
+        <label>
+          Type
+          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+            <option value="annual">Annual</option>
+            <option value="sick">Sick</option>
+            <option value="unpaid">Unpaid</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>
+          Start date
+          <input
+            type="date"
+            required
+            value={form.start_date}
+            onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+          />
+        </label>
+        <label>
+          End date
+          <input
+            type="date"
+            required
+            value={form.end_date}
+            onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+          />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          Reason
+          <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+        </label>
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Submitting...' : 'Request leave'}
+        </button>
+      </form>
+
+      <h3>My Leave Requests</h3>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Dates</th>
+            <th>Reason</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td>{LEAVE_TYPE_LABELS[r.type] || r.type}</td>
+              <td>
+                {r.start_date} → {r.end_date}
+              </td>
+              <td>{r.reason || '—'}</td>
+              <td>
+                <StatusBadge status={r.status} />
+                {r.review_note && <div className="hint">{r.review_note}</div>}
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={4} className="empty-row">
+                No leave requests yet.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+function LettersPanel({ hasEmployeeRecord }) {
+  const [rows, setRows] = useState([]);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ direction: 'request', subject: '', message: '' });
+
+  function load() {
+    api.get('/letters').then(setRows).catch((e) => setError(e.message));
+  }
+
+  useEffect(load, []);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      await api.post('/letters', form);
+      setForm({ direction: form.direction, subject: '', message: '' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!hasEmployeeRecord) {
+    return (
+      <p className="hint">
+        Your login isn’t linked to an employee record yet, so you can’t send letters. Ask your Admin to link your
+        account.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {error && <div className="error-banner">{error}</div>}
+      <form className="card form-grid" onSubmit={handleSubmit}>
+        <label>
+          Type
+          <select value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })}>
+            <option value="request">Request a letter from HR (e.g. employment confirmation)</option>
+            <option value="to_hr">Write to HR / Admin</option>
+          </select>
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          Subject
+          <input required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
+          Message
+          <input value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+        </label>
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Sending...' : 'Send'}
+        </button>
+      </form>
+
+      <h3>My Letters</h3>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Subject</th>
+            <th>Message</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((l) => (
+            <tr key={l.id}>
+              <td>{l.subject}</td>
+              <td>{l.message || '—'}</td>
+              <td>
+                <StatusBadge status={l.status} />
+                {l.response && <div className="hint">Reply: {l.response}</div>}
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={3} className="empty-row">
+                No letters yet.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
+export default function Profile() {
+  const [employee, setEmployee] = useState(null);
+  const [tab, setTab] = useState('profile');
+
+  useEffect(() => {
+    api
+      .get('/employees')
+      .then((rows) => setEmployee(rows[0] || null))
+      .catch(() => setEmployee(null));
+  }, []);
+
+  return (
+    <Layout title="My Profile">
+      <div className="tab-row">
+        <button className={`tab-btn ${tab === 'profile' ? 'tab-btn-active' : ''}`} onClick={() => setTab('profile')}>
+          Profile
+        </button>
+        <button className={`tab-btn ${tab === 'leave' ? 'tab-btn-active' : ''}`} onClick={() => setTab('leave')}>
+          Leave
+        </button>
+        <button className={`tab-btn ${tab === 'letters' ? 'tab-btn-active' : ''}`} onClick={() => setTab('letters')}>
+          Letters
+        </button>
+      </div>
+
+      {tab === 'profile' && <ProfilePanel employee={employee} />}
+      {tab === 'leave' && <LeavePanel hasEmployeeRecord={!!employee} />}
+      {tab === 'letters' && <LettersPanel hasEmployeeRecord={!!employee} />}
     </Layout>
   );
 }

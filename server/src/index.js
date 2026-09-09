@@ -20,6 +20,8 @@ const userRoutes = require('./routes/users');
 const employeeRoutes = require('./routes/employees');
 const documentRoutes = require('./routes/documents');
 const auditRoutes = require('./routes/audit');
+const leaveRoutes = require('./routes/leave');
+const letterRoutes = require('./routes/letters');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -52,6 +54,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/audit-log', auditRoutes);
+app.use('/api/leave', leaveRoutes);
+app.use('/api/letters', letterRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

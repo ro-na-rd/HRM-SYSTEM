@@ -715,6 +715,22 @@ select {
   color: var(--danger);
 }
 
+.status-pending {
+  background: #fff4e0;
+  color: #b6740c;
+}
+
+.status-approved,
+.status-resolved {
+  background: #e4f8ec;
+  color: #16a34a;
+}
+
+.status-rejected {
+  background: #fdecea;
+  color: var(--danger);
+}
+
 .employee-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
