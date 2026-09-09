@@ -21,6 +21,7 @@ const EMPTY_FORM = {
   phone: '',
   notes: '',
   user_id: '',
+  manager_id: '',
 };
 
 export default function EmployeeDetail() {
@@ -37,6 +38,7 @@ export default function EmployeeDetail() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [employeeLogins, setEmployeeLogins] = useState(null);
+  const [allEmployees, setAllEmployees] = useState(null);
   const [statusBusy, setStatusBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
 
@@ -82,6 +84,7 @@ export default function EmployeeDetail() {
     if (user?.role === 'admin') {
       api.get('/users').then(setEmployeeLogins).catch(() => setEmployeeLogins([]));
     }
+    api.get('/employees').then(setAllEmployees).catch(() => setAllEmployees([]));
   }, [user]);
 
   function startEditing() {
@@ -93,6 +96,7 @@ export default function EmployeeDetail() {
       phone: employee.phone || '',
       notes: employee.notes || '',
       user_id: employee.user_id || '',
+      manager_id: employee.manager_id || '',
     });
     setEditing(true);
   }
@@ -109,6 +113,7 @@ export default function EmployeeDetail() {
         hire_date: editForm.hire_date || null,
         phone: editForm.phone || null,
         notes: editForm.notes || null,
+        manager_id: editForm.manager_id ? Number(editForm.manager_id) : null,
       };
       if (user?.role === 'admin') {
         payload.user_id = editForm.user_id ? Number(editForm.user_id) : null;
@@ -261,6 +266,22 @@ export default function EmployeeDetail() {
             Phone
             <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
           </label>
+          <label>
+            Manager
+            <select
+              value={editForm.manager_id}
+              onChange={(e) => setEditForm({ ...editForm, manager_id: e.target.value })}
+            >
+              <option value="">— None —</option>
+              {(allEmployees || [])
+                .filter((e) => e.id !== employee.id)
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.full_name}
+                  </option>
+                ))}
+            </select>
+          </label>
           {user?.role === 'admin' && (
             <label>
               Linked login account
@@ -308,6 +329,9 @@ export default function EmployeeDetail() {
           </div>
           <div>
             <strong>Phone:</strong> {employee.phone || '—'}
+          </div>
+          <div>
+            <strong>Manager:</strong> {employee.manager_name || '—'}
           </div>
           {user?.role === 'admin' && (
             <div>

@@ -23,8 +23,8 @@ router.use(requireAuth);
 // Columns safe to send to the client - never the stored filename, IV, or
 // auth tag for the photo (internal storage details, not needed by the UI).
 // has_photo lets the frontend know whether to request /:id/photo at all.
-const SAFE_COLUMNS = `id, full_name, department, position, hire_date, phone, notes, user_id, active, created_at,
-  (photo_stored_filename IS NOT NULL) AS has_photo`;
+const SAFE_COLUMNS = `id, full_name, department, position, hire_date, phone, notes, user_id, manager_id, active,
+  created_at, (photo_stored_filename IS NOT NULL) AS has_photo`;
 
 function findOwnEmployeeId(userId) {
   const employee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
@@ -45,10 +45,12 @@ router.get('/:id', (req, res) => {
   const id = Number(req.params.id);
   const employee = db
     .prepare(
-      `SELECT e.id, e.full_name, e.department, e.position, e.hire_date, e.phone, e.notes, e.user_id, e.active,
-              e.created_at, (e.photo_stored_filename IS NOT NULL) AS has_photo,
-              u.name AS linked_user_name, u.email AS linked_user_email
+      `SELECT e.id, e.full_name, e.department, e.position, e.hire_date, e.phone, e.notes, e.user_id, e.manager_id,
+              e.active, e.created_at, (e.photo_stored_filename IS NOT NULL) AS has_photo,
+              u.name AS linked_user_name, u.email AS linked_user_email,
+              m.full_name AS manager_name
        FROM employees e LEFT JOIN users u ON u.id = e.user_id
+                         LEFT JOIN employees m ON m.id = e.manager_id
        WHERE e.id = ?`
     )
     .get(id);
@@ -68,7 +70,24 @@ const employeeSchema = z.object({
   phone: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   user_id: z.number().int().optional().nullable(),
+  manager_id: z.number().int().optional().nullable(),
 });
+
+// Walks up the proposed manager chain to make sure assigning managerId to
+// employeeId would not create a reporting loop (A manages B who manages A).
+function wouldCreateManagerCycle(employeeId, managerId) {
+  if (managerId === employeeId) return true;
+  let current = managerId;
+  const seen = new Set();
+  while (current != null) {
+    if (current === employeeId) return true;
+    if (seen.has(current)) break; // already-broken cycle elsewhere; don't loop forever
+    seen.add(current);
+    const row = db.prepare('SELECT manager_id FROM employees WHERE id = ?').get(current);
+    current = row ? row.manager_id : null;
+  }
+  return false;
+}
 
 // Employee self-service: they may update their own phone number only.
 // Everything else (name, department, position, hire date, notes, linked
@@ -102,10 +121,19 @@ router.post('/', requireRole('admin', 'hr'), (req, res) => {
 
   const info = db
     .prepare(
-      `INSERT INTO employees (full_name, department, position, hire_date, phone, notes, user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO employees (full_name, department, position, hire_date, phone, notes, user_id, manager_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(d.full_name, d.department ?? null, d.position ?? null, d.hire_date ?? null, d.phone ?? null, d.notes ?? null, d.user_id ?? null);
+    .run(
+      d.full_name,
+      d.department ?? null,
+      d.position ?? null,
+      d.hire_date ?? null,
+      d.phone ?? null,
+      d.notes ?? null,
+      d.user_id ?? null,
+      d.manager_id ?? null
+    );
 
   writeAuditLog(req.user.id, 'employee_created', 'employee', info.lastInsertRowid);
   const employee = db.prepare(`SELECT ${SAFE_COLUMNS} FROM employees WHERE id = ?`).get(info.lastInsertRowid);
@@ -122,10 +150,25 @@ router.patch('/:id', requireRole('admin', 'hr'), (req, res) => {
   const d = parsed.data;
 
   const merged = { ...existing, ...d };
+
+  if (merged.manager_id != null && wouldCreateManagerCycle(id, merged.manager_id)) {
+    return res.status(400).json({ error: 'That would create a reporting loop - choose a different manager' });
+  }
+
   db.prepare(
-    `UPDATE employees SET full_name = ?, department = ?, position = ?, hire_date = ?, phone = ?, notes = ?, user_id = ?
+    `UPDATE employees SET full_name = ?, department = ?, position = ?, hire_date = ?, phone = ?, notes = ?, user_id = ?, manager_id = ?
      WHERE id = ?`
-  ).run(merged.full_name, merged.department, merged.position, merged.hire_date, merged.phone, merged.notes, merged.user_id, id);
+  ).run(
+    merged.full_name,
+    merged.department,
+    merged.position,
+    merged.hire_date,
+    merged.phone,
+    merged.notes,
+    merged.user_id,
+    merged.manager_id,
+    id
+  );
 
   writeAuditLog(req.user.id, 'employee_updated', 'employee', id, { fields: Object.keys(d) });
   res.json(db.prepare(`SELECT ${SAFE_COLUMNS} FROM employees WHERE id = ?`).get(id));

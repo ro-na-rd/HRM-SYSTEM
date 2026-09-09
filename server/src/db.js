@@ -133,4 +133,9 @@ if (!userColumns.includes('photo_stored_filename')) {
   `);
 }
 
+// Migration: reporting structure, for the Organization page.
+if (!employeeColumns.includes('manager_id')) {
+  db.exec(`ALTER TABLE employees ADD COLUMN manager_id INTEGER REFERENCES employees(id) ON DELETE SET NULL;`);
+}
+
 module.exports = db;

@@ -6,17 +6,11 @@ import Employees from './pages/Employees';
 import EmployeeDetail from './pages/EmployeeDetail';
 import Documents from './pages/Documents';
 import LeaveManagement from './pages/LeaveManagement';
+import Organization from './pages/Organization';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import ComingSoon from './pages/ComingSoon';
-import {
-  RecruitmentIcon,
-  AttendanceIcon,
-  PerformanceIcon,
-  PayrollIcon,
-  OrganizationIcon,
-  ReportsIcon,
-} from './components/Icons';
+import { RecruitmentIcon, AttendanceIcon, PerformanceIcon, PayrollIcon, ReportsIcon } from './components/Icons';
 
 function ProtectedRoute({ roles, children }) {
   const { user, loading } = useAuth();
@@ -116,7 +110,7 @@ export default function App() {
         path="/organization"
         element={
           <ProtectedRoute roles={STAFF_ROLES}>
-            <ComingSoon title="Organization" icon={OrganizationIcon} />
+            <Organization />
           </ProtectedRoute>
         }
       />
