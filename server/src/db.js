@@ -105,4 +105,17 @@ if (!letterColumns.includes('attachment_stored_filename')) {
   `);
 }
 
+// Migration: profile photo, stored encrypted like everything else, on the
+// employee record itself (not the login/user), since it's the same
+// underlying person shown on both the Admin/HR side and the Employee's own view.
+const employeeColumns = db.prepare("PRAGMA table_info(employees)").all().map((c) => c.name);
+if (!employeeColumns.includes('photo_stored_filename')) {
+  db.exec(`
+    ALTER TABLE employees ADD COLUMN photo_stored_filename TEXT;
+    ALTER TABLE employees ADD COLUMN photo_mime_type TEXT;
+    ALTER TABLE employees ADD COLUMN photo_iv TEXT;
+    ALTER TABLE employees ADD COLUMN photo_auth_tag TEXT;
+  `);
+}
+
 module.exports = db;

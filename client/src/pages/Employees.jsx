@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import Layout from '../components/Layout';
+import Avatar from '../components/Avatar';
 
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
@@ -77,6 +78,7 @@ export default function Employees() {
       <table className="data-table">
         <thead>
           <tr>
+            <th></th>
             <th>Name</th>
             <th>Department</th>
             <th>Position</th>
@@ -88,6 +90,9 @@ export default function Employees() {
         <tbody>
           {employees.map((emp) => (
             <tr key={emp.id}>
+              <td>
+                <Avatar id={emp.id} name={emp.full_name} hasPhoto={emp.has_photo} size={30} />
+              </td>
               <td>{emp.full_name}</td>
               <td>{emp.department || '—'}</td>
               <td>{emp.position || '—'}</td>
@@ -104,7 +109,7 @@ export default function Employees() {
           ))}
           {employees.length === 0 && (
             <tr>
-              <td colSpan={6} className="empty-row">
+              <td colSpan={7} className="empty-row">
                 No employees yet.
               </td>
             </tr>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api, downloadDocument } from '../api/client';
 import Layout from '../components/Layout';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../AuthContext';
 
 const CATEGORY_LABELS = {
@@ -37,6 +38,38 @@ export default function EmployeeDetail() {
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [employeeLogins, setEmployeeLogins] = useState(null);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  async function handlePhotoChange(e) {
+    const selected = e.target.files[0];
+    if (!selected) return;
+    setError('');
+    setPhotoBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', selected);
+      await api.postForm(`/employees/${id}/photo`, formData);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPhotoBusy(false);
+      e.target.value = '';
+    }
+  }
+
+  async function handleRemovePhoto() {
+    setError('');
+    setPhotoBusy(true);
+    try {
+      await api.delete(`/employees/${id}/photo`);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   function load() {
     api.get(`/employees/${id}`).then(setEmployee).catch((e) => setError(e.message));
@@ -176,6 +209,21 @@ export default function EmployeeDetail() {
       </div>
 
       {error && <div className="error-banner">{error}</div>}
+
+      <div className="card profile-photo-row">
+        <Avatar id={employee.id} name={employee.full_name} hasPhoto={employee.has_photo} size={72} />
+        <div className="profile-photo-actions">
+          <label className="button-like">
+            {photoBusy ? 'Uploading...' : employee.has_photo ? 'Change photo' : 'Add photo'}
+            <input type="file" accept="image/*" hidden onChange={handlePhotoChange} disabled={photoBusy} />
+          </label>
+          {employee.has_photo && (
+            <button className="danger" onClick={handleRemovePhoto} disabled={photoBusy}>
+              Remove photo
+            </button>
+          )}
+        </div>
+      </div>
 
       {editing ? (
         <form className="card form-grid" onSubmit={handleSaveEdit}>

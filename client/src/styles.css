@@ -346,6 +346,13 @@ body {
   background: rgba(22, 86, 201, 0.07);
 }
 
+.avatar-photo {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
 .avatar-circle {
   display: flex;
   align-items: center;
@@ -357,6 +364,7 @@ body {
   color: #ffffff;
   font-weight: 700;
   font-size: 0.85rem;
+  flex-shrink: 0;
   flex-shrink: 0;
 }
 
@@ -572,6 +580,35 @@ button.danger:hover {
   border-radius: 10px;
   padding: 18px;
   margin-bottom: 20px;
+}
+
+.profile-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.profile-photo-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.button-like {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.button-like:hover {
+  background: var(--primary-hover);
 }
 
 .form-grid {
