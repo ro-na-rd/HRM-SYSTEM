@@ -44,6 +44,16 @@ export async function downloadDocument(id, filename) {
   window.URL.revokeObjectURL(url);
 }
 
+export async function viewDocument(id) {
+  const res = await fetch(`/api/documents/${id}/view`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Could not open document');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  // Give the new tab a moment to load the blob before revoking it.
+  setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+}
+
 export async function downloadLetterAttachment(id, filename) {
   const res = await fetch(`/api/letters/${id}/attachment`, { credentials: 'include' });
   if (!res.ok) throw new Error('Download failed');
