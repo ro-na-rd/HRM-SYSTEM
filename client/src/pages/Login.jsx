@@ -20,7 +20,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       const user = await login(email, password, remember);
-      navigate(user.role === 'employee' ? '/profile' : '/dashboard');
+      navigate(user.role === 'employee' ? '/employee-dashboard' : '/dashboard');
     } catch (err) {
       setError(err.message);
     } finally {

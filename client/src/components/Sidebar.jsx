@@ -15,6 +15,8 @@ import {
   ChevronLeftIcon,
   ProfileIcon,
   MailIcon,
+  BellIcon,
+  TrainingIcon,
 } from './Icons';
 
 const NAV_ITEMS = [
@@ -30,12 +32,20 @@ const NAV_ITEMS = [
   { to: '/reports', label: 'Reports', icon: ReportsIcon },
 ];
 
-// Employee accounts only ever have their own profile, leave requests, and
-// letters to navigate between - not the full staff navigation above.
+// Employee accounts only ever see their own self-service area - not the
+// full staff navigation above.
 const EMPLOYEE_NAV_ITEMS = [
+  { to: '/employee-dashboard', label: 'Dashboard', icon: DashboardIcon },
   { to: '/profile', label: 'My Profile', icon: ProfileIcon, end: true },
+  { to: '/profile/attendance', label: 'Attendance', icon: AttendanceIcon },
   { to: '/profile/leave', label: 'Leave', icon: LeaveIcon },
+  { to: '/profile/documents', label: 'My Documents', icon: DocumentsIcon },
   { to: '/profile/letters', label: 'Letters', icon: MailIcon },
+  { to: '/profile/payslips', label: 'Payslips', icon: PayrollIcon },
+  { to: '/profile/performance', label: 'Performance', icon: PerformanceIcon },
+  { to: '/profile/training', label: 'Training', icon: TrainingIcon },
+  { to: '/profile/notifications', label: 'Notifications', icon: BellIcon },
+  { to: '/profile/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile, role }) {

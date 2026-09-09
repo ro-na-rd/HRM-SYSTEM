@@ -19,6 +19,13 @@ const TITLES = {
   '/profile': 'My Profile',
   '/profile/leave': 'Leave',
   '/profile/letters': 'Letters',
+  '/profile/documents': 'My Documents',
+  '/profile/attendance': 'Attendance',
+  '/profile/payslips': 'Payslips',
+  '/profile/performance': 'Performance',
+  '/profile/training': 'Training',
+  '/profile/notifications': 'Notifications',
+  '/profile/settings': 'Settings',
 };
 
 export default function Layout({ children, title }) {
