@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import Layout from '../components/Layout';
 import { useAuth } from '../AuthContext';
@@ -197,7 +198,7 @@ function LettersPanel({ hasEmployeeRecord }) {
     <>
       {error && <div className="error-banner">{error}</div>}
       <form className="card form-grid" onSubmit={handleSubmit}>
-        <label>
+        <label style={{ gridColumn: '1 / -1' }}>
           Type
           <select value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })}>
             <option value="request">Request a letter from HR (e.g. employment confirmation)</option>
@@ -252,7 +253,7 @@ function LettersPanel({ hasEmployeeRecord }) {
 
 export default function Profile() {
   const [employee, setEmployee] = useState(null);
-  const [tab, setTab] = useState('profile');
+  const location = useLocation();
 
   useEffect(() => {
     api
@@ -261,20 +262,10 @@ export default function Profile() {
       .catch(() => setEmployee(null));
   }, []);
 
-  return (
-    <Layout title="My Profile">
-      <div className="tab-row">
-        <button className={`tab-btn ${tab === 'profile' ? 'tab-btn-active' : ''}`} onClick={() => setTab('profile')}>
-          Profile
-        </button>
-        <button className={`tab-btn ${tab === 'leave' ? 'tab-btn-active' : ''}`} onClick={() => setTab('leave')}>
-          Leave
-        </button>
-        <button className={`tab-btn ${tab === 'letters' ? 'tab-btn-active' : ''}`} onClick={() => setTab('letters')}>
-          Letters
-        </button>
-      </div>
+  const tab = location.pathname === '/profile/leave' ? 'leave' : location.pathname === '/profile/letters' ? 'letters' : 'profile';
 
+  return (
+    <Layout>
       {tab === 'profile' && <ProfilePanel employee={employee} />}
       {tab === 'leave' && <LeavePanel hasEmployeeRecord={!!employee} />}
       {tab === 'letters' && <LettersPanel hasEmployeeRecord={!!employee} />}

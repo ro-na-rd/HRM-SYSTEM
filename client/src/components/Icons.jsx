@@ -38,6 +38,15 @@ export function EmployeesIcon(props) {
   );
 }
 
+export function ProfileIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20c0-4.1 3.4-7.5 7.5-7.5s7.5 3.4 7.5 7.5" />
+    </Svg>
+  );
+}
+
 export function RecruitmentIcon(props) {
   return (
     <Svg {...props}>

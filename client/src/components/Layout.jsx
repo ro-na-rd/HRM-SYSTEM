@@ -17,6 +17,8 @@ const TITLES = {
   '/reports': 'Reports',
   '/settings': 'Settings',
   '/profile': 'My Profile',
+  '/profile/leave': 'Leave',
+  '/profile/letters': 'Letters',
 };
 
 export default function Layout({ children, title }) {
@@ -42,20 +44,17 @@ export default function Layout({ children, title }) {
   }
 
   const resolvedTitle = title || TITLES[location.pathname] || 'Employees';
-  const isEmployeeUser = user?.role === 'employee';
 
   return (
     <div className="app-shell">
-      {!isEmployeeUser && (
-        <Sidebar
-          role={user?.role}
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed((c) => !c)}
-          mobileOpen={mobileOpen}
-          onCloseMobile={() => setMobileOpen(false)}
-        />
-      )}
-      <div className={`app-main ${!isEmployeeUser && collapsed ? 'app-main-collapsed' : ''} ${isEmployeeUser ? 'app-main-no-sidebar' : ''}`}>
+      <Sidebar
+        role={user?.role}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileOpen}
+        onCloseMobile={() => setMobileOpen(false)}
+      />
+      <div className={`app-main ${collapsed ? 'app-main-collapsed' : ''}`}>
         <Header
           title={resolvedTitle}
           user={user}
