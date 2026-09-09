@@ -1,0 +1,94 @@
+const express = require('express');
+const { z } = require('zod');
+const db = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { writeAuditLog } = require('../lib/audit');
+
+const router = express.Router();
+
+router.use(requireAuth);
+
+function findOwnEmployeeId(userId) {
+  const employee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
+  return employee ? employee.id : null;
+}
+
+// Admin/HR see everyone's requests. Employees see only their own.
+router.get('/', (req, res) => {
+  if (req.user.role === 'admin' || req.user.role === 'hr') {
+    const rows = db
+      .prepare(
+        `SELECT lr.*, e.full_name AS employee_name
+         FROM leave_requests lr JOIN employees e ON e.id = lr.employee_id
+         ORDER BY lr.created_at DESC`
+      )
+      .all();
+    return res.json(rows);
+  }
+
+  const employeeId = findOwnEmployeeId(req.user.id);
+  if (!employeeId) return res.json([]);
+  const rows = db
+    .prepare('SELECT * FROM leave_requests WHERE employee_id = ? ORDER BY created_at DESC')
+    .all(employeeId);
+  res.json(rows);
+});
+
+const leaveSchema = z.object({
+  type: z.enum(['annual', 'sick', 'unpaid', 'other']),
+  start_date: z.string().min(1),
+  end_date: z.string().min(1),
+  reason: z.string().optional().nullable(),
+});
+
+router.post('/', (req, res) => {
+  const employeeId = findOwnEmployeeId(req.user.id);
+  if (!employeeId) {
+    return res
+      .status(400)
+      .json({ error: 'Your login isn’t linked to an employee record yet. Ask your Admin to link it in Employees.' });
+  }
+
+  const parsed = leaveSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const d = parsed.data;
+
+  if (d.end_date < d.start_date) {
+    return res.status(400).json({ error: 'End date must be on or after the start date' });
+  }
+
+  const info = db
+    .prepare(
+      `INSERT INTO leave_requests (employee_id, type, start_date, end_date, reason)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(employeeId, d.type, d.start_date, d.end_date, d.reason ?? null);
+
+  writeAuditLog(req.user.id, 'leave_requested', 'leave_request', info.lastInsertRowid, { type: d.type });
+  res.status(201).json(db.prepare('SELECT * FROM leave_requests WHERE id = ?').get(info.lastInsertRowid));
+});
+
+const reviewSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+  review_note: z.string().optional().nullable(),
+});
+
+router.patch('/:id/status', requireRole('admin', 'hr'), (req, res) => {
+  const id = Number(req.params.id);
+  const existing = db.prepare('SELECT * FROM leave_requests WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Leave request not found' });
+
+  const parsed = reviewSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const d = parsed.data;
+
+  db.prepare(
+    `UPDATE leave_requests SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = datetime('now')
+     WHERE id = ?`
+  ).run(d.status, d.review_note ?? null, req.user.id, id);
+
+  writeAuditLog(req.user.id, d.status === 'approved' ? 'leave_approved' : 'leave_rejected', 'leave_request', id);
+  res.json(db.prepare('SELECT * FROM leave_requests WHERE id = ?').get(id));
+});
+
+module.exports = router;

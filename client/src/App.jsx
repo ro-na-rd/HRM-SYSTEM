@@ -5,13 +5,13 @@ import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import EmployeeDetail from './pages/EmployeeDetail';
 import Documents from './pages/Documents';
+import LeaveManagement from './pages/LeaveManagement';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import ComingSoon from './pages/ComingSoon';
 import {
   RecruitmentIcon,
   AttendanceIcon,
-  LeaveIcon,
   PerformanceIcon,
   PayrollIcon,
   OrganizationIcon,
@@ -92,7 +92,7 @@ export default function App() {
         path="/leave-management"
         element={
           <ProtectedRoute roles={STAFF_ROLES}>
-            <ComingSoon title="Leave Management" icon={LeaveIcon} />
+            <LeaveManagement />
           </ProtectedRoute>
         }
       />
