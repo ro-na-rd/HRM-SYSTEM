@@ -12,7 +12,11 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Session expired, please log in again' });
   }
 
-  const user = db.prepare('SELECT id, name, email, role, active FROM users WHERE id = ?').get(payload.sub);
+  const user = db
+    .prepare(
+      'SELECT id, name, email, role, active, (photo_stored_filename IS NOT NULL) AS has_photo FROM users WHERE id = ?'
+    )
+    .get(payload.sub);
   if (!user || !user.active) {
     return res.status(401).json({ error: 'Account not found or disabled' });
   }
