@@ -118,4 +118,19 @@ if (!employeeColumns.includes('photo_stored_filename')) {
   `);
 }
 
+// Migration: account photo for the LOGIN itself (Admin/HR/Employee) - shown
+// in the header avatar for whoever is signed in. Separate from the
+// employee-record photo above, which is about the staff roster entry
+// (visible to Admin/HR on the Employees list) and doesn't apply to
+// Admin/HR logins that have no linked employee record.
+const userColumns = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
+if (!userColumns.includes('photo_stored_filename')) {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN photo_stored_filename TEXT;
+    ALTER TABLE users ADD COLUMN photo_mime_type TEXT;
+    ALTER TABLE users ADD COLUMN photo_iv TEXT;
+    ALTER TABLE users ADD COLUMN photo_auth_tag TEXT;
+  `);
+}
+
 module.exports = db;

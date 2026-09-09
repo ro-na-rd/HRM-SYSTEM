@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { MenuIcon, SearchIcon, BellIcon, LogOutIcon } from './Icons';
 import ChangePasswordModal from './ChangePasswordModal';
+import ChangePhotoModal from './ChangePhotoModal';
 
 export default function Header({ title, user, onOpenMobileMenu, onLogout, canSearchEmployees }) {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showChangePhoto, setShowChangePhoto] = useState(false);
   const searchBoxRef = useRef(null);
   const notifRef = useRef(null);
   const profileRef = useRef(null);
@@ -94,7 +96,11 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
 
         <div className="header-profile" ref={profileRef}>
           <button className="header-profile-btn" onClick={() => setShowProfileMenu((s) => !s)}>
-            <span className="avatar-circle">{user?.name?.[0]?.toUpperCase() || '?'}</span>
+            {user?.has_photo ? (
+              <img src="/api/auth/photo" alt={user?.name} className="avatar-photo" style={{ width: 30, height: 30 }} />
+            ) : (
+              <span className="avatar-circle">{user?.name?.[0]?.toUpperCase() || '?'}</span>
+            )}
             <span className="header-profile-text">
               <strong>{user?.name}</strong>
               <em>{user?.role}</em>
@@ -102,6 +108,15 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
           </button>
           {showProfileMenu && (
             <div className="header-dropdown header-dropdown-right">
+              <button
+                className="header-dropdown-item"
+                onClick={() => {
+                  setShowChangePhoto(true);
+                  setShowProfileMenu(false);
+                }}
+              >
+                Change profile photo
+              </button>
               <button
                 className="header-dropdown-item"
                 onClick={() => {
@@ -121,6 +136,7 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
       </div>
 
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      {showChangePhoto && <ChangePhotoModal onClose={() => setShowChangePhoto(false)} />}
     </header>
   );
 }
