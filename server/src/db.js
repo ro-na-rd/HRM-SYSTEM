@@ -88,4 +88,21 @@ db.exec(`
   );
 `);
 
+// Migration: letters can optionally carry an encrypted file attachment
+// (e.g. the actual letter HR prepared in response to a "request a letter"
+// letter). Added after the letters table already existed in the wild, so
+// it's an ALTER TABLE guarded by a column-existence check rather than part
+// of the CREATE TABLE above.
+const letterColumns = db.prepare("PRAGMA table_info(letters)").all().map((c) => c.name);
+if (!letterColumns.includes('attachment_stored_filename')) {
+  db.exec(`
+    ALTER TABLE letters ADD COLUMN attachment_original_filename TEXT;
+    ALTER TABLE letters ADD COLUMN attachment_stored_filename TEXT;
+    ALTER TABLE letters ADD COLUMN attachment_mime_type TEXT;
+    ALTER TABLE letters ADD COLUMN attachment_size INTEGER;
+    ALTER TABLE letters ADD COLUMN attachment_iv TEXT;
+    ALTER TABLE letters ADD COLUMN attachment_auth_tag TEXT;
+  `);
+}
+
 module.exports = db;
