@@ -9,8 +9,19 @@ import LeaveManagement from './pages/LeaveManagement';
 import Organization from './pages/Organization';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
+import MyDocuments from './pages/MyDocuments';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 import ComingSoon from './pages/ComingSoon';
-import { RecruitmentIcon, AttendanceIcon, PerformanceIcon, PayrollIcon, ReportsIcon } from './components/Icons';
+import {
+  RecruitmentIcon,
+  AttendanceIcon,
+  PerformanceIcon,
+  PayrollIcon,
+  ReportsIcon,
+  TrainingIcon,
+  BellIcon,
+  SettingsIcon,
+} from './components/Icons';
 
 function ProtectedRoute({ roles, children }) {
   const { user, loading } = useAuth();
@@ -24,7 +35,7 @@ function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={user.role === 'employee' ? '/profile' : '/dashboard'} replace />;
+  return <Navigate to={user.role === 'employee' ? '/employee-dashboard' : '/dashboard'} replace />;
 }
 
 const STAFF_ROLES = ['admin', 'hr'];
@@ -131,6 +142,14 @@ export default function App() {
         }
       />
       <Route
+        path="/employee-dashboard"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <EmployeeDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/profile"
         element={
           <ProtectedRoute roles={['employee']}>
@@ -151,6 +170,62 @@ export default function App() {
         element={
           <ProtectedRoute roles={['employee']}>
             <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/documents"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <MyDocuments />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/attendance"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <ComingSoon title="Attendance" icon={AttendanceIcon} description="Clock-in/out and attendance history will show up here once HR turns on attendance tracking." />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/payslips"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <ComingSoon title="Payslips" icon={PayrollIcon} description="Your payslips will appear here once HR sets up payroll." />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/performance"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <ComingSoon title="Performance" icon={PerformanceIcon} description="Your performance reviews will appear here once HR publishes one." />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/training"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <ComingSoon title="Training" icon={TrainingIcon} description="Training assigned to you by HR will appear here." />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/notifications"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <ComingSoon title="Notifications" icon={BellIcon} description="A dedicated notification center is coming - for now, check Recent Activity on your Dashboard." />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/settings"
+        element={
+          <ProtectedRoute roles={['employee']}>
+            <ComingSoon title="Settings" icon={SettingsIcon} description="More preferences are coming. For now, use the profile menu (top right) to change your password or photo." />
           </ProtectedRoute>
         }
       />

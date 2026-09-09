@@ -47,6 +47,16 @@ export function ProfileIcon(props) {
   );
 }
 
+export function TrainingIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M2.5 8L12 3.5 21.5 8 12 12.5 2.5 8z" />
+      <path d="M6 10v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5" />
+      <path d="M21.5 8v6" />
+    </Svg>
+  );
+}
+
 export function RecruitmentIcon(props) {
   return (
     <Svg {...props}>
