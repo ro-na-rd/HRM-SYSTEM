@@ -1045,6 +1045,60 @@ select {
   white-space: nowrap;
 }
 
+.org-tree,
+.org-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 28px;
+}
+
+.org-tree-root {
+  padding-left: 0;
+}
+
+.org-tree li {
+  position: relative;
+  padding: 10px 0;
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+  margin-left: 2px;
+}
+
+.org-tree-root > li {
+  border-left: none;
+  padding-left: 0;
+  margin-left: 0;
+}
+
+.org-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.org-node-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.org-node-info a {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.org-node-info a:hover {
+  color: var(--primary);
+}
+
+.org-node-info span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .coming-soon-badge {
   display: inline-flex;
   align-items: center;
