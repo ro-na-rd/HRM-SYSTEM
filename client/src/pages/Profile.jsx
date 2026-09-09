@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api, downloadLetterAttachment } from '../api/client';
 import Layout from '../components/Layout';
+import Avatar from '../components/Avatar';
 import { useAuth } from '../AuthContext';
 
 const LEAVE_TYPE_LABELS = {
@@ -15,10 +16,82 @@ function StatusBadge({ status }) {
   return <span className={`status-badge status-${status}`}>{status[0].toUpperCase() + status.slice(1)}</span>;
 }
 
-function ProfilePanel({ employee }) {
+function ProfilePanel({ employee, onChanged }) {
   const { user } = useAuth();
+  const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [phone, setPhone] = useState(employee?.phone || '');
+  const [savingPhone, setSavingPhone] = useState(false);
+
+  useEffect(() => {
+    setPhone(employee?.phone || '');
+  }, [employee?.phone]);
+
+  async function handlePhotoChange(e) {
+    const file = e.target.files[0];
+    if (!file || !employee) return;
+    setError('');
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      await api.postForm(`/employees/${employee.id}/photo`, formData);
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
+  async function handleRemovePhoto() {
+    if (!employee) return;
+    setError('');
+    setUploading(true);
+    try {
+      await api.delete(`/employees/${employee.id}/photo`);
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleSavePhone(e) {
+    e.preventDefault();
+    setError('');
+    setSavingPhone(true);
+    try {
+      await api.patch('/employees/me', { phone });
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingPhone(false);
+    }
+  }
+
   return (
     <>
+      {error && <div className="error-banner">{error}</div>}
+
+      <div className="card profile-photo-row">
+        <Avatar id={employee?.id} name={user?.name} hasPhoto={employee?.has_photo} size={72} />
+        <div className="profile-photo-actions">
+          <label className="button-like">
+            {uploading ? 'Uploading...' : employee?.has_photo ? 'Change photo' : 'Add photo'}
+            <input type="file" accept="image/*" hidden onChange={handlePhotoChange} disabled={uploading} />
+          </label>
+          {employee?.has_photo && (
+            <button className="danger" onClick={handleRemovePhoto} disabled={uploading}>
+              Remove photo
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="card employee-summary">
         <div>
           <strong>Name:</strong> {user?.name}
@@ -37,6 +110,19 @@ function ProfilePanel({ employee }) {
           </>
         )}
       </div>
+
+      {employee && (
+        <form className="card form-grid" onSubmit={handleSavePhone}>
+          <label>
+            Phone
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your phone number" />
+          </label>
+          <button type="submit" disabled={savingPhone}>
+            {savingPhone ? 'Saving...' : 'Save phone number'}
+          </button>
+        </form>
+      )}
+
       <p className="hint">
         Document records (contracts, ID, letters, etc.) are managed by HR and are not accessible from employee
         accounts. Please contact HR if you need a copy of a document.
@@ -265,18 +351,20 @@ export default function Profile() {
   const [employee, setEmployee] = useState(null);
   const location = useLocation();
 
-  useEffect(() => {
+  function loadEmployee() {
     api
       .get('/employees')
       .then((rows) => setEmployee(rows[0] || null))
       .catch(() => setEmployee(null));
-  }, []);
+  }
+
+  useEffect(loadEmployee, []);
 
   const tab = location.pathname === '/profile/leave' ? 'leave' : location.pathname === '/profile/letters' ? 'letters' : 'profile';
 
   return (
     <Layout>
-      {tab === 'profile' && <ProfilePanel employee={employee} />}
+      {tab === 'profile' && <ProfilePanel employee={employee} onChanged={loadEmployee} />}
       {tab === 'leave' && <LeavePanel hasEmployeeRecord={!!employee} />}
       {tab === 'letters' && <LettersPanel hasEmployeeRecord={!!employee} />}
     </Layout>
