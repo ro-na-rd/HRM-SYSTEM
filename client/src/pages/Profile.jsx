@@ -16,16 +16,34 @@ function StatusBadge({ status }) {
   return <span className={`status-badge status-${status}`}>{status[0].toUpperCase() + status.slice(1)}</span>;
 }
 
+const EMPTY_PERSONAL = {
+  phone: '',
+  date_of_birth: '',
+  gender: '',
+  address: '',
+  emergency_contact_name: '',
+  emergency_contact_relationship: '',
+  emergency_contact_phone: '',
+};
+
 function ProfilePanel({ employee, onChanged }) {
   const { user } = useAuth();
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [phone, setPhone] = useState(employee?.phone || '');
-  const [savingPhone, setSavingPhone] = useState(false);
+  const [personal, setPersonal] = useState(EMPTY_PERSONAL);
+  const [savingPersonal, setSavingPersonal] = useState(false);
 
   useEffect(() => {
-    setPhone(employee?.phone || '');
-  }, [employee?.phone]);
+    setPersonal({
+      phone: employee?.phone || '',
+      date_of_birth: employee?.date_of_birth || '',
+      gender: employee?.gender || '',
+      address: employee?.address || '',
+      emergency_contact_name: employee?.emergency_contact_name || '',
+      emergency_contact_relationship: employee?.emergency_contact_relationship || '',
+      emergency_contact_phone: employee?.emergency_contact_phone || '',
+    });
+  }, [employee]);
 
   async function handlePhotoChange(e) {
     const file = e.target.files[0];
@@ -59,17 +77,17 @@ function ProfilePanel({ employee, onChanged }) {
     }
   }
 
-  async function handleSavePhone(e) {
+  async function handleSavePersonal(e) {
     e.preventDefault();
     setError('');
-    setSavingPhone(true);
+    setSavingPersonal(true);
     try {
-      await api.patch('/employees/me', { phone });
+      await api.patch('/employees/me', personal);
       onChanged();
     } catch (err) {
       setError(err.message);
     } finally {
-      setSavingPhone(false);
+      setSavingPersonal(false);
     }
   }
 
@@ -92,41 +110,114 @@ function ProfilePanel({ employee, onChanged }) {
         </div>
       </div>
 
-      <div className="card employee-summary">
-        <div>
-          <strong>Name:</strong> {user?.name}
+      <div className="card">
+        <div className="page-header">
+          <h3>Employment Information</h3>
+          <span className="hint">Set by HR — contact them to correct anything here</span>
         </div>
-        <div>
-          <strong>Email:</strong> {user?.email}
+        <div className="employee-summary">
+          <div>
+            <strong>Employee ID:</strong> {employee ? `#${employee.id}` : '—'}
+          </div>
+          <div>
+            <strong>Job Title:</strong> {employee?.position || '—'}
+          </div>
+          <div>
+            <strong>Department:</strong> {employee?.department || '—'}
+          </div>
+          <div>
+            <strong>Date Joined:</strong> {employee?.hire_date || '—'}
+          </div>
+          <div>
+            <strong>Manager:</strong> {employee?.manager_name || '—'}
+          </div>
+          <div>
+            <strong>Status:</strong> {employee ? (employee.active ? 'Active' : 'Inactive') : '—'}
+          </div>
         </div>
-        {employee && (
-          <>
-            <div>
-              <strong>Department:</strong> {employee.department || '—'}
-            </div>
-            <div>
-              <strong>Position:</strong> {employee.position || '—'}
-            </div>
-          </>
-        )}
       </div>
 
-      {employee && (
-        <form className="card form-grid" onSubmit={handleSavePhone}>
+      {employee ? (
+        <form className="card form-grid" onSubmit={handleSavePersonal}>
+          <div className="page-header" style={{ gridColumn: '1 / -1' }}>
+            <h3>Personal Information</h3>
+          </div>
+          <label>
+            Full name (read-only)
+            <input value={user?.name || ''} disabled />
+          </label>
+          <label>
+            Email (read-only)
+            <input value={user?.email || ''} disabled />
+          </label>
           <label>
             Phone
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your phone number" />
+            <input
+              value={personal.phone}
+              onChange={(e) => setPersonal({ ...personal, phone: e.target.value })}
+              placeholder="Your phone number"
+            />
           </label>
-          <button type="submit" disabled={savingPhone}>
-            {savingPhone ? 'Saving...' : 'Save phone number'}
+          <label>
+            Date of birth
+            <input
+              type="date"
+              value={personal.date_of_birth}
+              onChange={(e) => setPersonal({ ...personal, date_of_birth: e.target.value })}
+            />
+          </label>
+          <label>
+            Gender
+            <input
+              value={personal.gender}
+              onChange={(e) => setPersonal({ ...personal, gender: e.target.value })}
+              placeholder="Optional"
+            />
+          </label>
+          <label style={{ gridColumn: '1 / -1' }}>
+            Address
+            <input
+              value={personal.address}
+              onChange={(e) => setPersonal({ ...personal, address: e.target.value })}
+              placeholder="Optional"
+            />
+          </label>
+
+          <div className="page-header" style={{ gridColumn: '1 / -1' }}>
+            <h3>Emergency Contact</h3>
+          </div>
+          <label>
+            Name
+            <input
+              value={personal.emergency_contact_name}
+              onChange={(e) => setPersonal({ ...personal, emergency_contact_name: e.target.value })}
+            />
+          </label>
+          <label>
+            Relationship
+            <input
+              value={personal.emergency_contact_relationship}
+              onChange={(e) => setPersonal({ ...personal, emergency_contact_relationship: e.target.value })}
+            />
+          </label>
+          <label>
+            Phone
+            <input
+              value={personal.emergency_contact_phone}
+              onChange={(e) => setPersonal({ ...personal, emergency_contact_phone: e.target.value })}
+            />
+          </label>
+
+          <button type="submit" disabled={savingPersonal} style={{ gridColumn: '1 / -1', justifySelf: 'start' }}>
+            {savingPersonal ? 'Saving...' : 'Save changes'}
           </button>
         </form>
+      ) : (
+        <p className="hint">
+          Your login isn’t linked to an employee record yet, so there's no personal information to show. Ask your
+          Admin to link it in Employees.
+        </p>
       )}
-
-      <p className="hint">
-        Document records (contracts, ID, letters, etc.) are managed by HR and are not accessible from employee
-        accounts. Please contact HR if you need a copy of a document.
-      </p>
     </>
   );
 }
@@ -167,9 +258,35 @@ function LeavePanel({ hasEmployeeRecord }) {
     );
   }
 
+  const pendingCount = rows.filter((r) => r.status === 'pending').length;
+  const approvedCount = rows.filter((r) => r.status === 'approved').length;
+  const rejectedCount = rows.filter((r) => r.status === 'rejected').length;
+
   return (
     <>
       {error && <div className="error-banner">{error}</div>}
+
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div>
+            <div className="stat-value">{pendingCount}</div>
+            <div className="stat-label">Pending</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div>
+            <div className="stat-value">{approvedCount}</div>
+            <div className="stat-label">Approved</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div>
+            <div className="stat-value">{rejectedCount}</div>
+            <div className="stat-label">Rejected</div>
+          </div>
+        </div>
+      </div>
+
       <form className="card form-grid" onSubmit={handleSubmit}>
         <label>
           Type
@@ -215,6 +332,8 @@ function LeavePanel({ hasEmployeeRecord }) {
             <th>Dates</th>
             <th>Reason</th>
             <th>Status</th>
+            <th>Approved By</th>
+            <th>Comment</th>
           </tr>
         </thead>
         <tbody>
@@ -227,13 +346,14 @@ function LeavePanel({ hasEmployeeRecord }) {
               <td>{r.reason || '—'}</td>
               <td>
                 <StatusBadge status={r.status} />
-                {r.review_note && <div className="hint">{r.review_note}</div>}
               </td>
+              <td>{r.reviewed_by_name || '—'}</td>
+              <td>{r.review_note || '—'}</td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={4} className="empty-row">
+              <td colSpan={6} className="empty-row">
                 No leave requests yet.
               </td>
             </tr>
