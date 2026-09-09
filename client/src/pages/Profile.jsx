@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { api } from '../api/client';
+import { api, downloadLetterAttachment } from '../api/client';
 import Layout from '../components/Layout';
 import { useAuth } from '../AuthContext';
 
@@ -225,6 +225,7 @@ function LettersPanel({ hasEmployeeRecord }) {
             <th>Subject</th>
             <th>Message</th>
             <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -236,11 +237,20 @@ function LettersPanel({ hasEmployeeRecord }) {
                 <StatusBadge status={l.status} />
                 {l.response && <div className="hint">Reply: {l.response}</div>}
               </td>
+              <td>
+                {l.attachment_original_filename ? (
+                  <button onClick={() => downloadLetterAttachment(l.id, l.attachment_original_filename)}>
+                    Download {l.attachment_original_filename}
+                  </button>
+                ) : (
+                  '—'
+                )}
+              </td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={3} className="empty-row">
+              <td colSpan={4} className="empty-row">
                 No letters yet.
               </td>
             </tr>

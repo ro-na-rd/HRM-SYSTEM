@@ -112,6 +112,7 @@ function LettersPanel() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [responseDraft, setResponseDraft] = useState({});
+  const [attachmentDraft, setAttachmentDraft] = useState({});
 
   function load() {
     api.get('/letters').then(setRows).catch((e) => setError(e.message));
@@ -128,7 +129,10 @@ function LettersPanel() {
     setBusyId(id);
     setError('');
     try {
-      await api.patch(`/letters/${id}/resolve`, { response });
+      const formData = new FormData();
+      formData.append('response', response);
+      if (attachmentDraft[id]) formData.append('attachment', attachmentDraft[id]);
+      await api.patchForm(`/letters/${id}/resolve`, formData);
       load();
     } catch (err) {
       setError(err.message);
@@ -164,6 +168,9 @@ function LettersPanel() {
               <td>
                 <StatusBadge status={l.status} />
                 {l.response && <div className="hint">Reply: {l.response}</div>}
+                {l.attachment_original_filename && (
+                  <div className="hint">Attached: {l.attachment_original_filename}</div>
+                )}
               </td>
               <td className="actions-cell">
                 {l.status === 'pending' ? (
@@ -173,6 +180,13 @@ function LettersPanel() {
                       value={responseDraft[l.id] || ''}
                       onChange={(e) => setResponseDraft({ ...responseDraft, [l.id]: e.target.value })}
                     />
+                    {l.direction === 'request' && (
+                      <input
+                        type="file"
+                        title="Attach the letter file (optional)"
+                        onChange={(e) => setAttachmentDraft({ ...attachmentDraft, [l.id]: e.target.files[0] })}
+                      />
+                    )}
                     <button disabled={busyId === l.id} onClick={() => resolve(l.id)}>
                       Resolve
                     </button>
