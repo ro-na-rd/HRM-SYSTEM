@@ -21,10 +21,11 @@ router.get('/mine', requireAuth, (req, res) => {
           OR (a.target_type = 'leave_request' AND a.target_id IN (SELECT id FROM leave_requests WHERE employee_id = ?))
           OR (a.target_type = 'letter' AND a.target_id IN (SELECT id FROM letters WHERE employee_id = ?))
           OR (a.target_type = 'payslip' AND a.target_id IN (SELECT id FROM payslips WHERE employee_id = ?))
+          OR (a.target_type = 'performance_review' AND a.target_id IN (SELECT id FROM performance_reviews WHERE employee_id = ? AND status = 'published'))
        ORDER BY a.created_at DESC
        LIMIT 20`
     )
-    .all(req.user.id, employeeId, employeeId, employeeId, employeeId);
+    .all(req.user.id, employeeId, employeeId, employeeId, employeeId, employeeId);
   res.json(rows);
 });
 

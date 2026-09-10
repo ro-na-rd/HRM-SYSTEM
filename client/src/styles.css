@@ -653,12 +653,42 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.95rem;
   font-family: inherit;
+}
+
+textarea {
+  min-height: 68px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+/* Employee's read-only performance review card */
+.review-field {
+  margin-top: 12px;
+}
+
+.review-field strong {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.review-field p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
+.review-ack {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
 /* Custom select menus (Department / Position on the employee form) */
