@@ -13,13 +13,14 @@ import MyDocuments from './pages/MyDocuments';
 import MyPayslips from './pages/MyPayslips';
 import MyPerformance from './pages/MyPerformance';
 import MyAttendance from './pages/MyAttendance';
+import MyNotifications from './pages/MyNotifications';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import Compensation from './pages/Compensation';
 import Performance from './pages/Performance';
 import Attendance from './pages/Attendance';
 import Reports from './pages/Reports';
 import ComingSoon from './pages/ComingSoon';
-import { RecruitmentIcon, TrainingIcon, BellIcon, SettingsIcon } from './components/Icons';
+import { RecruitmentIcon, TrainingIcon, SettingsIcon } from './components/Icons';
 
 function ProtectedRoute({ roles, children }) {
   const { user, loading } = useAuth();
@@ -215,7 +216,7 @@ export default function App() {
         path="/profile/notifications"
         element={
           <ProtectedRoute roles={['employee']}>
-            <ComingSoon title="Notifications" icon={BellIcon} description="A dedicated notification center is coming - for now, check Recent Activity on your Dashboard." />
+            <MyNotifications />
           </ProtectedRoute>
         }
       />

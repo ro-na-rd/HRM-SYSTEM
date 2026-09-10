@@ -245,4 +245,23 @@ if (!tableNames.includes('attendance')) {
   `);
 }
 
+// Migration: in-app notifications. One row per recipient; written by the
+// server when something happens that a user should know about (their leave
+// was approved, HR got a new request, a payslip was added, ...).
+if (!tableNames.includes('notifications')) {
+  db.exec(`
+    CREATE TABLE notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT,
+      link TEXT,
+      read_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_notifications_user ON notifications (user_id, read_at);
+  `);
+}
+
 module.exports = db;
