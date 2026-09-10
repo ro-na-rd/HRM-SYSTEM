@@ -12,18 +12,14 @@ import Profile from './pages/Profile';
 import MyDocuments from './pages/MyDocuments';
 import MyPayslips from './pages/MyPayslips';
 import MyPerformance from './pages/MyPerformance';
+import MyAttendance from './pages/MyAttendance';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import Compensation from './pages/Compensation';
 import Performance from './pages/Performance';
+import Attendance from './pages/Attendance';
+import Reports from './pages/Reports';
 import ComingSoon from './pages/ComingSoon';
-import {
-  RecruitmentIcon,
-  AttendanceIcon,
-  ReportsIcon,
-  TrainingIcon,
-  BellIcon,
-  SettingsIcon,
-} from './components/Icons';
+import { RecruitmentIcon, TrainingIcon, BellIcon, SettingsIcon } from './components/Icons';
 
 function ProtectedRoute({ roles, children }) {
   const { user, loading } = useAuth();
@@ -91,7 +87,7 @@ export default function App() {
         path="/attendance"
         element={
           <ProtectedRoute roles={STAFF_ROLES}>
-            <ComingSoon title="Attendance" icon={AttendanceIcon} />
+            <Attendance />
           </ProtectedRoute>
         }
       />
@@ -131,7 +127,7 @@ export default function App() {
         path="/reports"
         element={
           <ProtectedRoute roles={STAFF_ROLES}>
-            <ComingSoon title="Reports" icon={ReportsIcon} />
+            <Reports />
           </ProtectedRoute>
         }
       />
@@ -187,7 +183,7 @@ export default function App() {
         path="/profile/attendance"
         element={
           <ProtectedRoute roles={['employee']}>
-            <ComingSoon title="Attendance" icon={AttendanceIcon} description="Clock-in/out and attendance history will show up here once HR turns on attendance tracking." />
+            <MyAttendance />
           </ProtectedRoute>
         }
       />

@@ -222,4 +222,27 @@ if (!tableNames.includes('performance_reviews')) {
   `);
 }
 
+// Migration: Attendance. One row per employee per day. Employees clock
+// themselves in/out; HR can also add or correct records.
+// clock_in / clock_out are ISO timestamps; work_date is the employee's
+// local YYYY-MM-DD.
+if (!tableNames.includes('attendance')) {
+  db.exec(`
+    CREATE TABLE attendance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      work_date TEXT NOT NULL,
+      clock_in TEXT,
+      clock_out TEXT,
+      status TEXT NOT NULL DEFAULT 'present'
+        CHECK (status IN ('present', 'absent', 'leave', 'remote', 'half_day')),
+      note TEXT,
+      recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (employee_id, work_date)
+    );
+  `);
+}
+
 module.exports = db;
