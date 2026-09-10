@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
+import { useEmployeeMeta } from '../lib/employeeMeta';
 
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ full_name: '', department: '', position: '', hire_date: '', phone: '' });
+  const meta = useEmployeeMeta();
 
   function load() {
     api
@@ -53,12 +55,32 @@ export default function Employees() {
           </label>
           <label>
             Department
-            <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
+            <input
+              list="department-options"
+              placeholder="Choose or type"
+              value={form.department}
+              onChange={(e) => setForm({ ...form, department: e.target.value })}
+            />
           </label>
           <label>
             Position
-            <input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
+            <input
+              list="position-options"
+              placeholder="Choose or type"
+              value={form.position}
+              onChange={(e) => setForm({ ...form, position: e.target.value })}
+            />
           </label>
+          <datalist id="department-options">
+            {meta.departments.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+          <datalist id="position-options">
+            {meta.positions.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
           <label>
             Hire date
             <input

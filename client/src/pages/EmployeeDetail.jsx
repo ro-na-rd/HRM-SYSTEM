@@ -4,6 +4,7 @@ import { api, downloadDocument } from '../api/client';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../AuthContext';
+import { useEmployeeMeta } from '../lib/employeeMeta';
 
 const CATEGORY_LABELS = {
   contract: 'Contract',
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
 export default function EmployeeDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const meta = useEmployeeMeta();
   const [employee, setEmployee] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [error, setError] = useState('');
@@ -243,6 +245,8 @@ export default function EmployeeDetail() {
           <label>
             Department
             <input
+              list="department-options"
+              placeholder="Choose or type"
               value={editForm.department}
               onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
             />
@@ -250,10 +254,22 @@ export default function EmployeeDetail() {
           <label>
             Position
             <input
+              list="position-options"
+              placeholder="Choose or type"
               value={editForm.position}
               onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
             />
           </label>
+          <datalist id="department-options">
+            {meta.departments.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+          <datalist id="position-options">
+            {meta.positions.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
           <label>
             Hire date
             <input

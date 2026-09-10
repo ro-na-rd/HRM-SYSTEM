@@ -56,6 +56,22 @@ router.get('/', (req, res) => {
   res.json(employees);
 });
 
+// Distinct departments and positions already in use, to populate the
+// dropdowns on the add/edit employee forms. Must stay above '/:id' so
+// Express doesn't treat "meta" as an :id.
+router.get('/meta', requireRole('admin', 'hr'), (req, res) => {
+  const distinct = (column) =>
+    db
+      .prepare(
+        `SELECT DISTINCT ${column} AS v FROM employees
+         WHERE ${column} IS NOT NULL AND TRIM(${column}) <> ''
+         ORDER BY ${column} COLLATE NOCASE`
+      )
+      .all()
+      .map((r) => r.v);
+  res.json({ departments: distinct('department'), positions: distinct('position') });
+});
+
 router.get('/:id', (req, res) => {
   const id = Number(req.params.id);
   const employee = db
