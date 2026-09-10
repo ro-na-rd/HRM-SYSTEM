@@ -24,6 +24,8 @@ const leaveRoutes = require('./routes/leave');
 const letterRoutes = require('./routes/letters');
 const payrollRoutes = require('./routes/payroll');
 const performanceRoutes = require('./routes/performance');
+const attendanceRoutes = require('./routes/attendance');
+const reportRoutes = require('./routes/reports');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -60,6 +62,8 @@ app.use('/api/leave', leaveRoutes);
 app.use('/api/letters', letterRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/performance', performanceRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
