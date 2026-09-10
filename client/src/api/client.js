@@ -54,6 +54,15 @@ export async function viewDocument(id) {
   setTimeout(() => window.URL.revokeObjectURL(url), 60000);
 }
 
+export async function viewPayslipFile(id) {
+  const res = await fetch(`/api/payroll/payslips/${id}/file`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Could not open payslip file');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+}
+
 export async function downloadLetterAttachment(id, filename) {
   const res = await fetch(`/api/letters/${id}/attachment`, { credentials: 'include' });
   if (!res.ok) throw new Error('Download failed');

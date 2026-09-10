@@ -20,10 +20,11 @@ router.get('/mine', requireAuth, (req, res) => {
           OR (a.target_type = 'employee' AND a.target_id = ?)
           OR (a.target_type = 'leave_request' AND a.target_id IN (SELECT id FROM leave_requests WHERE employee_id = ?))
           OR (a.target_type = 'letter' AND a.target_id IN (SELECT id FROM letters WHERE employee_id = ?))
+          OR (a.target_type = 'payslip' AND a.target_id IN (SELECT id FROM payslips WHERE employee_id = ?))
        ORDER BY a.created_at DESC
        LIMIT 20`
     )
-    .all(req.user.id, employeeId, employeeId, employeeId);
+    .all(req.user.id, employeeId, employeeId, employeeId, employeeId);
   res.json(rows);
 });
 
