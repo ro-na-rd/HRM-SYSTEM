@@ -3,6 +3,7 @@ const { z } = require('zod');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { writeAuditLog } = require('../lib/audit');
+const { notifyStaff, notifyEmployee } = require('../lib/notify');
 
 const router = express.Router();
 
@@ -70,6 +71,18 @@ router.post('/', (req, res) => {
     .run(employeeId, d.type, d.start_date, d.end_date, d.reason ?? null);
 
   writeAuditLog(req.user.id, 'leave_requested', 'leave_request', info.lastInsertRowid, { type: d.type });
+
+  const emp = db.prepare('SELECT full_name FROM employees WHERE id = ?').get(employeeId);
+  notifyStaff(
+    {
+      type: 'leave_request',
+      title: 'New leave request',
+      body: `${emp.full_name} requested ${d.type} leave (${d.start_date} → ${d.end_date})`,
+      link: '/leave-management',
+    },
+    req.user.id
+  );
+
   res.status(201).json(db.prepare('SELECT * FROM leave_requests WHERE id = ?').get(info.lastInsertRowid));
 });
 
@@ -93,6 +106,16 @@ router.patch('/:id/status', requireRole('admin', 'hr'), (req, res) => {
   ).run(d.status, d.review_note ?? null, req.user.id, id);
 
   writeAuditLog(req.user.id, d.status === 'approved' ? 'leave_approved' : 'leave_rejected', 'leave_request', id);
+
+  notifyEmployee(existing.employee_id, {
+    type: `leave_${d.status}`,
+    title: `Leave request ${d.status}`,
+    body:
+      d.review_note ||
+      `Your ${existing.type} leave (${existing.start_date} → ${existing.end_date}) was ${d.status}.`,
+    link: '/profile/leave',
+  });
+
   res.json(db.prepare('SELECT * FROM leave_requests WHERE id = ?').get(id));
 });
 

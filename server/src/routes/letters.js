@@ -8,6 +8,7 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
+const { notifyStaff, notifyEmployee } = require('../lib/notify');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -75,6 +76,13 @@ router.post('/', (req, res) => {
     .run(employeeId, d.direction, d.subject, d.message ?? null);
 
   writeAuditLog(req.user.id, 'letter_submitted', 'letter', info.lastInsertRowid, { direction: d.direction });
+
+  const emp = db.prepare('SELECT full_name FROM employees WHERE id = ?').get(employeeId);
+  notifyStaff(
+    { type: 'letter', title: 'New letter from an employee', body: `${emp.full_name}: ${d.subject}`, link: '/leave-management' },
+    req.user.id
+  );
+
   res.status(201).json(db.prepare(`SELECT ${SAFE_COLUMNS} FROM letters WHERE id = ?`).get(info.lastInsertRowid));
 });
 
@@ -139,6 +147,14 @@ router.patch('/:id/resolve', requireRole('admin', 'hr'), upload.single('attachme
   );
 
   writeAuditLog(req.user.id, 'letter_resolved', 'letter', id, { attached: !!req.file });
+
+  notifyEmployee(existing.employee_id, {
+    type: 'letter_resolved',
+    title: 'HR responded to your letter',
+    body: existing.subject,
+    link: '/profile/letters',
+  });
+
   res.json(db.prepare(`SELECT ${SAFE_COLUMNS} FROM letters WHERE id = ?`).get(id));
 });
 

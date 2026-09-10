@@ -3,6 +3,7 @@ const { z } = require('zod');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { writeAuditLog } = require('../lib/audit');
+const { notifyEmployee } = require('../lib/notify');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -168,6 +169,12 @@ router.post('/', requireRole('admin', 'hr'), (req, res) => {
   ).run(d.employee_id, d.work_date, clockIn, clockOut, d.status, d.note || null, req.user.id, now);
 
   writeAuditLog(req.user.id, 'attendance_recorded', 'attendance', d.employee_id, { work_date: d.work_date });
+  notifyEmployee(d.employee_id, {
+    type: 'attendance',
+    title: 'Attendance updated',
+    body: `Your attendance for ${d.work_date} was set to ${d.status.replace('_', ' ')} by HR.`,
+    link: '/profile/attendance',
+  });
   res.status(201).json(
     db.prepare('SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?').get(d.employee_id, d.work_date)
   );

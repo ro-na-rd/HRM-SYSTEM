@@ -8,6 +8,7 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
+const { notifyEmployee } = require('../lib/notify');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -206,6 +207,14 @@ router.post('/payslips', requireRole('admin', 'hr'), upload.single('file'), (req
     employeeId: d.employee_id,
     period: d.period_month,
   });
+
+  notifyEmployee(d.employee_id, {
+    type: 'payslip',
+    title: 'New payslip',
+    body: `Your payslip for ${d.period_month} is available.`,
+    link: '/profile/payslips',
+  });
+
   res.status(201).json(db.prepare('SELECT * FROM payslips WHERE id = ?').get(info.lastInsertRowid));
 });
 

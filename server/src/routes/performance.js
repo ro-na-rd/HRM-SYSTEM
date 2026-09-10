@@ -3,9 +3,19 @@ const { z } = require('zod');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { writeAuditLog } = require('../lib/audit');
+const { notifyEmployee } = require('../lib/notify');
 
 const router = express.Router();
 router.use(requireAuth);
+
+function notifyPublished(employeeId, period) {
+  notifyEmployee(employeeId, {
+    type: 'review',
+    title: 'Performance review published',
+    body: `Your review for ${period} is ready to read.`,
+    link: '/profile/performance',
+  });
+}
 
 function findOwnEmployeeId(userId) {
   const e = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
@@ -116,6 +126,7 @@ router.post('/reviews', requireRole('admin', 'hr'), (req, res) => {
     info.lastInsertRowid,
     { employeeId: d.employee_id }
   );
+  if (d.status === 'published') notifyPublished(d.employee_id, d.period);
   res.status(201).json(db.prepare('SELECT * FROM performance_reviews WHERE id = ?').get(info.lastInsertRowid));
 });
 
@@ -169,6 +180,7 @@ router.patch('/reviews/:id', requireRole('admin', 'hr'), (req, res) => {
   writeAuditLog(req.user.id, nowPublishing ? 'review_published' : 'review_updated', 'performance_review', id, {
     employeeId: existing.employee_id,
   });
+  if (nowPublishing) notifyPublished(existing.employee_id, merged.period);
   res.json(db.prepare('SELECT * FROM performance_reviews WHERE id = ?').get(id));
 });
 

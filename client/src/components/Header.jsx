@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { timeAgo } from '../utils/timeAgo';
 import { MenuIcon, SearchIcon, BellIcon, LogOutIcon } from './Icons';
 import ChangePasswordModal from './ChangePasswordModal';
 import ChangePhotoModal from './ChangePhotoModal';
 
 export default function Header({ title, user, onOpenMobileMenu, onLogout, canSearchEmployees }) {
   const navigate = useNavigate();
+  const isEmployee = user?.role === 'employee';
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState([]);
   const [allEmployees, setAllEmployees] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifs, setNotifs] = useState({ items: [], unread: 0 });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showChangePhoto, setShowChangePhoto] = useState(false);
@@ -27,6 +30,48 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    function loadNotifs() {
+      api
+        .get('/notifications')
+        .then((d) => alive && setNotifs(d))
+        .catch(() => {});
+    }
+    loadNotifs();
+    const t = setInterval(loadNotifs, 45000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  function refreshNotifs() {
+    api.get('/notifications').then(setNotifs).catch(() => {});
+  }
+
+  async function openNotification(n) {
+    setShowNotifications(false);
+    if (!n.read_at) {
+      try {
+        await api.post(`/notifications/${n.id}/read`);
+      } catch {
+        /* ignore */
+      }
+      refreshNotifs();
+    }
+    if (n.link) navigate(n.link);
+  }
+
+  async function markAllNotificationsRead() {
+    try {
+      await api.post('/notifications/read-all');
+    } catch {
+      /* ignore */
+    }
+    refreshNotifs();
+  }
 
   async function handleQueryChange(value) {
     setQuery(value);
@@ -86,10 +131,49 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
         <div className="header-notif" ref={notifRef}>
           <button className="icon-btn" onClick={() => setShowNotifications((s) => !s)} aria-label="Notifications">
             <BellIcon size={19} />
+            {notifs.unread > 0 && (
+              <span className="notif-badge">{notifs.unread > 9 ? '9+' : notifs.unread}</span>
+            )}
           </button>
           {showNotifications && (
-            <div className="header-dropdown">
-              <p className="header-dropdown-empty">You're all caught up — no new notifications.</p>
+            <div className="header-dropdown header-notif-dropdown">
+              <div className="notif-head">
+                <strong>Notifications</strong>
+                {notifs.unread > 0 && (
+                  <button className="notif-mark-all" onClick={markAllNotificationsRead}>
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              {notifs.items.length === 0 ? (
+                <p className="header-dropdown-empty">You're all caught up — no notifications.</p>
+              ) : (
+                <ul className="notif-list">
+                  {notifs.items.slice(0, 8).map((n) => (
+                    <li key={n.id}>
+                      <button
+                        className={`notif-item ${n.read_at ? '' : 'notif-item-unread'}`}
+                        onClick={() => openNotification(n)}
+                      >
+                        <span className="notif-item-title">{n.title}</span>
+                        {n.body && <span className="notif-item-body">{n.body}</span>}
+                        <span className="notif-item-time">{timeAgo(n.created_at)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {isEmployee && (
+                <button
+                  className="notif-see-all"
+                  onClick={() => {
+                    setShowNotifications(false);
+                    navigate('/profile/notifications');
+                  }}
+                >
+                  See all notifications
+                </button>
+              )}
             </div>
           )}
         </div>

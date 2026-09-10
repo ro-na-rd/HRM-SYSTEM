@@ -7,6 +7,7 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
+const { notifyEmployee } = require('../lib/notify');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -111,6 +112,17 @@ router.post('/employee/:employeeId', upload.single('file'), (req, res) => {
     category,
     filename: req.file.originalname,
   });
+
+  // Only tell the employee when HR/Admin added something to their file -
+  // not when the employee uploaded it themselves.
+  if (staff) {
+    notifyEmployee(employeeId, {
+      type: 'document',
+      title: 'A document was added to your file',
+      body: req.file.originalname,
+      link: '/profile/documents',
+    });
+  }
 
   res.status(201).json({
     id: info.lastInsertRowid,
