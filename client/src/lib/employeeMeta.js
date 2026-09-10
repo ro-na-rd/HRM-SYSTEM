@@ -32,12 +32,18 @@ function uniqMerge(...lists) {
 }
 
 export function useEmployeeMeta() {
-  const [meta, setMeta] = useState({ departments: [], positions: [] });
+  const [meta, setMeta] = useState({ departments: [], positions: [], positionsByDepartment: {} });
 
   useEffect(() => {
     api
       .get('/employees/meta')
-      .then((d) => setMeta({ departments: d.departments || [], positions: d.positions || [] }))
+      .then((d) =>
+        setMeta({
+          departments: d.departments || [],
+          positions: d.positions || [],
+          positionsByDepartment: d.positionsByDepartment || {},
+        })
+      )
       .catch(() => {});
   }, []);
 
@@ -50,9 +56,12 @@ export function departmentOptions(meta) {
   return uniqMerge(DEFAULT_DEPARTMENTS, meta?.departments || []);
 }
 
-// Positions to show once a department is chosen: that department's list
-// first, then any other positions already in use on the roster.
+// Positions to show once a department is chosen: that department's own
+// list first, then any other positions already used *with that same
+// department* on the roster. Positions from other departments are not shown.
 export function positionOptions(department, meta) {
+  if (!department) return [];
   const mapped = DEPARTMENT_POSITIONS[department] || [];
-  return uniqMerge(mapped, meta?.positions || []);
+  const usedWithDept = (meta?.positionsByDepartment && meta.positionsByDepartment[department]) || [];
+  return uniqMerge(mapped, usedWithDept);
 }

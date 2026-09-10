@@ -69,7 +69,22 @@ router.get('/meta', requireRole('admin', 'hr'), (req, res) => {
       )
       .all()
       .map((r) => r.v);
-  res.json({ departments: distinct('department'), positions: distinct('position') });
+
+  // Which positions have actually been used with which department, so the
+  // Position dropdown can stay scoped to the chosen department.
+  const positionsByDepartment = {};
+  db.prepare(
+    `SELECT DISTINCT department AS d, position AS p FROM employees
+     WHERE department IS NOT NULL AND TRIM(department) <> ''
+       AND position IS NOT NULL AND TRIM(position) <> ''
+     ORDER BY position COLLATE NOCASE`
+  )
+    .all()
+    .forEach(({ d, p }) => {
+      (positionsByDepartment[d] = positionsByDepartment[d] || []).push(p);
+    });
+
+  res.json({ departments: distinct('department'), positions: distinct('position'), positionsByDepartment });
 });
 
 router.get('/:id', (req, res) => {

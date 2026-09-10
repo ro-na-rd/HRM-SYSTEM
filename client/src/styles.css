@@ -661,58 +661,134 @@ select {
   font-family: inherit;
 }
 
-/* Visible one-click option pickers (Department / Position on the employee form) */
-.option-field {
+/* Custom select menus (Department / Position on the employee form) */
+.select-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.option-field-label {
+.select-field-label {
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--text);
 }
 
-.option-pills {
+.select-menu {
+  position: relative;
+}
+
+.select-trigger {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-}
-
-.option-pill {
-  padding: 7px 14px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  width: 100%;
+  padding: 9px 12px;
   background: var(--card-bg);
-  color: var(--text);
-  font-size: 0.86rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
   font-weight: 500;
+  color: var(--text);
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-.option-pill:hover {
-  background: var(--accent-light);
+.select-trigger:hover {
+  background: var(--card-bg);
+  border-color: #c2ccde;
+}
+
+.select-trigger-open,
+.select-trigger-open:hover {
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(22, 86, 201, 0.12);
+}
+
+.select-trigger-placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.select-trigger svg {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.select-trigger-open svg {
+  transform: rotate(180deg);
+}
+
+.select-trigger-disabled {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.95rem;
+  cursor: not-allowed;
+}
+
+.select-dropdown {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 0.92rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.select-option:hover {
+  background: var(--accent-light);
+}
+
+.select-option-selected,
+.select-option-selected:hover {
+  color: var(--primary);
+  font-weight: 600;
+  background: var(--accent-light);
+}
+
+.select-option svg {
+  flex-shrink: 0;
   color: var(--primary);
 }
 
-.option-pill-selected,
-.option-pill-selected:hover {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #ffffff;
-}
-
-.option-other-input {
-  max-width: 280px;
-}
-
-.option-hint {
-  margin: 0;
-  font-size: 0.85rem;
+.select-option-other {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
   color: var(--muted);
+}
+
+.select-other-input {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .data-table {
