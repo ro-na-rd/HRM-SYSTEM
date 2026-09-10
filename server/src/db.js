@@ -153,4 +153,50 @@ if (!employeeColumns.includes('date_of_birth')) {
   `);
 }
 
+// Migration: Compensation / Payroll. HR-managed, employee-visible.
+//   compensation - one current-salary row per employee.
+//   payslips     - one row per employee per pay period, with an optional
+//                  encrypted PDF stored the same way as documents.
+const tableNames = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((t) => t.name);
+
+if (!tableNames.includes('compensation')) {
+  db.exec(`
+    CREATE TABLE compensation (
+      employee_id INTEGER PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
+      currency TEXT NOT NULL DEFAULT 'RWF',
+      gross_salary REAL,
+      pay_frequency TEXT NOT NULL DEFAULT 'monthly' CHECK (pay_frequency IN ('monthly', 'biweekly', 'weekly')),
+      effective_date TEXT,
+      note TEXT,
+      updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+}
+
+if (!tableNames.includes('payslips')) {
+  db.exec(`
+    CREATE TABLE payslips (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      period_month TEXT NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'RWF',
+      gross_pay REAL NOT NULL,
+      deductions REAL NOT NULL DEFAULT 0,
+      net_pay REAL NOT NULL,
+      deductions_note TEXT,
+      note TEXT,
+      file_original_filename TEXT,
+      file_stored_filename TEXT,
+      file_mime_type TEXT,
+      file_size INTEGER,
+      file_iv TEXT,
+      file_auth_tag TEXT,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (employee_id, period_month)
+    );
+  `);
+}
+
 module.exports = db;

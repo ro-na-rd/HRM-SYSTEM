@@ -10,13 +10,14 @@ import Organization from './pages/Organization';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import MyDocuments from './pages/MyDocuments';
+import MyPayslips from './pages/MyPayslips';
 import EmployeeDashboard from './pages/EmployeeDashboard';
+import Compensation from './pages/Compensation';
 import ComingSoon from './pages/ComingSoon';
 import {
   RecruitmentIcon,
   AttendanceIcon,
   PerformanceIcon,
-  PayrollIcon,
   ReportsIcon,
   TrainingIcon,
   BellIcon,
@@ -113,7 +114,7 @@ export default function App() {
         path="/compensation"
         element={
           <ProtectedRoute roles={STAFF_ROLES}>
-            <ComingSoon title="Compensation / Payroll" icon={PayrollIcon} />
+            <Compensation />
           </ProtectedRoute>
         }
       />
@@ -193,7 +194,7 @@ export default function App() {
         path="/profile/payslips"
         element={
           <ProtectedRoute roles={['employee']}>
-            <ComingSoon title="Payslips" icon={PayrollIcon} description="Your payslips will appear here once HR sets up payroll." />
+            <MyPayslips />
           </ProtectedRoute>
         }
       />
