@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
-import { useEmployeeMeta } from '../lib/employeeMeta';
+import OptionPicker from '../components/OptionPicker';
+import { useEmployeeMeta, departmentOptions, positionOptions } from '../lib/employeeMeta';
 
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
@@ -54,34 +55,6 @@ export default function Employees() {
             />
           </label>
           <label>
-            Department
-            <input
-              list="department-options"
-              placeholder="Choose or type"
-              value={form.department}
-              onChange={(e) => setForm({ ...form, department: e.target.value })}
-            />
-          </label>
-          <label>
-            Position
-            <input
-              list="position-options"
-              placeholder="Choose or type"
-              value={form.position}
-              onChange={(e) => setForm({ ...form, position: e.target.value })}
-            />
-          </label>
-          <datalist id="department-options">
-            {meta.departments.map((d) => (
-              <option key={d} value={d} />
-            ))}
-          </datalist>
-          <datalist id="position-options">
-            {meta.positions.map((p) => (
-              <option key={p} value={p} />
-            ))}
-          </datalist>
-          <label>
             Hire date
             <input
               type="date"
@@ -93,6 +66,27 @@ export default function Employees() {
             Phone
             <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </label>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <OptionPicker
+              label="Department"
+              options={departmentOptions(meta)}
+              value={form.department}
+              onChange={(v) => setForm({ ...form, department: v, position: '' })}
+              placeholder="Type a department"
+            />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <OptionPicker
+              label="Position"
+              options={positionOptions(form.department, meta)}
+              value={form.position}
+              onChange={(v) => setForm({ ...form, position: v })}
+              placeholder="Type a position"
+              disabled={!form.department}
+              hint="Select a department first."
+            />
+          </div>
           <button type="submit">Save employee</button>
         </form>
       )}
