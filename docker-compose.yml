@@ -1,0 +1,30 @@
+# Azul Tech HRM ("People") — single production container.
+# The React frontend is built and served by the Express API on one port.
+#
+#   docker compose up -d --build
+#   docker compose exec hrm npm run create-admin   # first run only
+#
+# Open http://localhost:4000
+services:
+  hrm:
+    build: .
+    image: azul-tech-hrm:latest
+    container_name: azul-tech-hrm
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "4000"
+    # JWT_SECRET and ENCRYPTION_KEY are read from server/.env
+    # (copy server/.env.example first and fill in generated values).
+    env_file:
+      - ./server/.env
+    volumes:
+      - hrm-data:/app/server/data        # SQLite database
+      - hrm-storage:/app/server/storage  # encrypted document files
+    restart: unless-stopped
+
+volumes:
+  hrm-data:
+  hrm-storage:

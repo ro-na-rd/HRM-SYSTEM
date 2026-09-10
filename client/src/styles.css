@@ -1200,18 +1200,28 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
   overflow: hidden;
-  background: #0c1730;
+  background: #0b1220;
 }
 
+/* The whole workstation photo, stretched to fill the viewport on both
+   axes so nothing is cropped and it reads edge-to-edge. A soft radial
+   overlay darkens the middle so the centred sign-in card stays readable. */
 .login-page-bg {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 15% 25%, rgba(60, 120, 235, 0.35), transparent 42%),
-    radial-gradient(circle at 82% 15%, rgba(34, 197, 220, 0.22), transparent 40%),
-    radial-gradient(circle at 78% 78%, rgba(37, 99, 235, 0.35), transparent 45%),
-    radial-gradient(circle at 25% 85%, rgba(14, 165, 180, 0.2), transparent 40%),
-    linear-gradient(135deg, #0a1226 0%, #0f1c3d 45%, #0a1428 100%);
+  background-color: #0b1220;
+  background-image: radial-gradient(
+      ellipse at center,
+      rgba(6, 12, 26, 0.72) 0%,
+      rgba(7, 13, 28, 0.55) 45%,
+      rgba(8, 14, 30, 0.6) 100%
+    ),
+    url('./assets/login-workstation.jpg');
+  background-size: cover, 100% 100%;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
 }
 
 .login-corner-brand {
@@ -1252,18 +1262,18 @@ select {
 .login-glass-card {
   position: relative;
   z-index: 1;
-  width: 380px;
+  width: 384px;
   max-width: calc(100vw - 40px);
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(10, 18, 38, 0.62);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 18px;
   padding: 40px 34px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
   color: #ffffff;
 }
 
@@ -1303,22 +1313,36 @@ select {
 
 .pill-input input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(6, 12, 26, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.38);
   color: #ffffff;
+  caret-color: #ffffff;
   border-radius: 999px;
   padding: 12px 44px 12px 18px;
   font-size: 0.92rem;
 }
 
 .pill-input input::placeholder {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .pill-input input:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.13);
+  border-color: var(--primary);
+  background: rgba(6, 12, 26, 0.75);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
+
+/* Keep browser-autofilled email/password white on the dark field
+   instead of Chrome's default white box with black text. */
+.pill-input input:-webkit-autofill,
+.pill-input input:-webkit-autofill:hover,
+.pill-input input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.38);
+  -webkit-box-shadow: 0 0 0 1000px rgba(6, 12, 26, 0.92) inset;
+  transition: background-color 9999s ease-in-out 0s;
 }
 
 .pill-input-icon {
@@ -1391,4 +1415,10 @@ select {
   background: rgba(220, 38, 38, 0.18);
   border: 1px solid rgba(248, 113, 113, 0.4);
   color: #fecaca;
+}
+
+@media (max-width: 720px) {
+  .login-page {
+    padding: 16px;
+  }
 }
