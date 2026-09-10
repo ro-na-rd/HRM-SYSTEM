@@ -661,6 +661,60 @@ select {
   font-family: inherit;
 }
 
+/* Visible one-click option pickers (Department / Position on the employee form) */
+.option-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option-field-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.option-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.option-pill {
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.option-pill:hover {
+  background: var(--accent-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.option-pill-selected,
+.option-pill-selected:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.option-other-input {
+  max-width: 280px;
+}
+
+.option-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;

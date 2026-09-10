@@ -4,7 +4,8 @@ import { api, downloadDocument } from '../api/client';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../AuthContext';
-import { useEmployeeMeta } from '../lib/employeeMeta';
+import OptionPicker from '../components/OptionPicker';
+import { useEmployeeMeta, departmentOptions, positionOptions } from '../lib/employeeMeta';
 
 const CATEGORY_LABELS = {
   contract: 'Contract',
@@ -243,34 +244,6 @@ export default function EmployeeDetail() {
             />
           </label>
           <label>
-            Department
-            <input
-              list="department-options"
-              placeholder="Choose or type"
-              value={editForm.department}
-              onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-            />
-          </label>
-          <label>
-            Position
-            <input
-              list="position-options"
-              placeholder="Choose or type"
-              value={editForm.position}
-              onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
-            />
-          </label>
-          <datalist id="department-options">
-            {meta.departments.map((d) => (
-              <option key={d} value={d} />
-            ))}
-          </datalist>
-          <datalist id="position-options">
-            {meta.positions.map((p) => (
-              <option key={p} value={p} />
-            ))}
-          </datalist>
-          <label>
             Hire date
             <input
               type="date"
@@ -282,6 +255,28 @@ export default function EmployeeDetail() {
             Phone
             <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
           </label>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <OptionPicker
+              label="Department"
+              options={departmentOptions(meta)}
+              value={editForm.department}
+              onChange={(v) => setEditForm({ ...editForm, department: v, position: '' })}
+              placeholder="Type a department"
+            />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <OptionPicker
+              label="Position"
+              options={positionOptions(editForm.department, meta)}
+              value={editForm.position}
+              onChange={(v) => setEditForm({ ...editForm, position: v })}
+              placeholder="Type a position"
+              disabled={!editForm.department}
+              hint="Select a department first."
+            />
+          </div>
+
           <label>
             Manager
             <select
