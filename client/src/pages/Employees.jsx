@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import Layout from '../components/Layout';
 import Avatar from '../components/Avatar';
-import OptionPicker from '../components/OptionPicker';
+import SelectMenu from '../components/SelectMenu';
 import { useEmployeeMeta, departmentOptions, positionOptions } from '../lib/employeeMeta';
 
 export default function Employees() {
@@ -54,6 +54,26 @@ export default function Employees() {
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
             />
           </label>
+
+          <SelectMenu
+            label="Department"
+            options={departmentOptions(meta)}
+            value={form.department}
+            onChange={(v) => setForm({ ...form, department: v, position: '' })}
+            placeholder="Select department"
+            otherPlaceholder="Type a department"
+          />
+          <SelectMenu
+            label="Position"
+            options={positionOptions(form.department, meta)}
+            value={form.position}
+            onChange={(v) => setForm({ ...form, position: v })}
+            placeholder="Select position"
+            otherPlaceholder="Type a position"
+            disabled={!form.department}
+            disabledText="Select department first"
+          />
+
           <label>
             Hire date
             <input
@@ -66,27 +86,6 @@ export default function Employees() {
             Phone
             <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </label>
-
-          <div style={{ gridColumn: '1 / -1' }}>
-            <OptionPicker
-              label="Department"
-              options={departmentOptions(meta)}
-              value={form.department}
-              onChange={(v) => setForm({ ...form, department: v, position: '' })}
-              placeholder="Type a department"
-            />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <OptionPicker
-              label="Position"
-              options={positionOptions(form.department, meta)}
-              value={form.position}
-              onChange={(v) => setForm({ ...form, position: v })}
-              placeholder="Type a position"
-              disabled={!form.department}
-              hint="Select a department first."
-            />
-          </div>
           <button type="submit">Save employee</button>
         </form>
       )}
