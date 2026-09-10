@@ -199,4 +199,27 @@ if (!tableNames.includes('payslips')) {
   `);
 }
 
+// Migration: Performance reviews. HR writes a review (draft), then
+// publishes it; the employee can then read it and acknowledge it.
+if (!tableNames.includes('performance_reviews')) {
+  db.exec(`
+    CREATE TABLE performance_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      period TEXT NOT NULL,
+      review_date TEXT,
+      rating INTEGER,
+      summary TEXT,
+      strengths TEXT,
+      improvements TEXT,
+      goals TEXT,
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+      acknowledged_at TEXT,
+      reviewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      published_at TEXT
+    );
+  `);
+}
+
 module.exports = db;

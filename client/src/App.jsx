@@ -11,13 +11,14 @@ import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import MyDocuments from './pages/MyDocuments';
 import MyPayslips from './pages/MyPayslips';
+import MyPerformance from './pages/MyPerformance';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import Compensation from './pages/Compensation';
+import Performance from './pages/Performance';
 import ComingSoon from './pages/ComingSoon';
 import {
   RecruitmentIcon,
   AttendanceIcon,
-  PerformanceIcon,
   ReportsIcon,
   TrainingIcon,
   BellIcon,
@@ -106,7 +107,7 @@ export default function App() {
         path="/performance"
         element={
           <ProtectedRoute roles={STAFF_ROLES}>
-            <ComingSoon title="Performance" icon={PerformanceIcon} />
+            <Performance />
           </ProtectedRoute>
         }
       />
@@ -202,7 +203,7 @@ export default function App() {
         path="/profile/performance"
         element={
           <ProtectedRoute roles={['employee']}>
-            <ComingSoon title="Performance" icon={PerformanceIcon} description="Your performance reviews will appear here once HR publishes one." />
+            <MyPerformance />
           </ProtectedRoute>
         }
       />
