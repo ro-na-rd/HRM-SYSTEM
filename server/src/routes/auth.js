@@ -79,6 +79,19 @@ router.post('/login', loginLimiter, (req, res) => {
 const SSO_STATE_COOKIE = 'hrm_sso_state';
 const SSO_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
+// Comma-separated emails that should start as (or be promoted to) 'admin'
+// the moment they sign in via SSO, rather than the default 'employee' —
+// same name and semantics as Lunchify's BOOTSTRAP_ADMIN_EMAILS (see that
+// repo's README): only ever promotes, never demotes, and only takes effect
+// on login, so leaving it set is harmless — it's not a standing override.
+function isBootstrapAdmin(email) {
+  return (process.env.BOOTSTRAP_ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email);
+}
+
 function setSessionCookie(res, user, { remember = false } = {}) {
   const maxAge = remember ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
   const token = jwt.sign({ sub: user.id, role: user.role }, process.env.JWT_SECRET, {
@@ -181,13 +194,13 @@ router.get('/sso/callback', async (req, res) => {
 
   if (!user) {
     // First time this person has used SSO and there's no HRM login yet.
-    // Auto-provision them, but ONLY at the lowest tier: role is always
-    // 'employee' here, never hr/admin — that access is still always a
-    // deliberate grant an Admin makes afterwards in User Accounts, exactly
-    // as it works for someone Admin creates by hand. This just removes the
-    // need for HR to pre-create a login for every single person before they
-    // can see their own basic profile, which is all an Employee login is
-    // for anyway (see README "Access model").
+    // Auto-provision them — 'admin' if they're on BOOTSTRAP_ADMIN_EMAILS
+    // (a named, deliberately-configured list — not something SSO decides on
+    // its own), 'employee' otherwise, never 'hr' (there's no bootstrap path
+    // to HR; that tier is always a manual promotion in User Accounts). This
+    // just removes the need for HR to pre-create a login for every single
+    // person before they can see their own basic profile, which is all an
+    // Employee login is for anyway (see README "Access model").
     //
     // Gated on the account having actually finished onboarding in Keycloak
     // (a verified email) — a Keycloak account that's still mid-setup
@@ -202,11 +215,20 @@ router.get('/sso/callback', async (req, res) => {
     // in through SSO — so it's a random value satisfying the NOT NULL
     // column, not a credential anyone needs to know.
     const password_hash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 12);
+    const role = isBootstrapAdmin(email) ? 'admin' : 'employee';
     const info = db
       .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-      .run(name, email, password_hash, 'employee');
+      .run(name, email, password_hash, role);
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
-    writeAuditLog(user.id, 'user_created_via_sso', 'user', user.id, { email });
+    writeAuditLog(user.id, 'user_created_via_sso', 'user', user.id, { email, role });
+  } else if (user.role !== 'admin' && isBootstrapAdmin(email)) {
+    // An existing (non-admin) account whose email is on the bootstrap list —
+    // promote on this login. Only ever raises the role, never lowers it,
+    // and only does anything the first time (once they're 'admin', this
+    // branch never fires for them again regardless of the env var).
+    db.prepare('UPDATE users SET role = ? WHERE id = ?').run('admin', user.id);
+    user.role = 'admin';
+    writeAuditLog(user.id, 'user_promoted_via_sso', 'user', user.id, { email, role: 'admin' });
   }
 
   setSessionCookie(res, user);
