@@ -51,30 +51,37 @@ function getClient() {
           });
         }
 
-        // Docker path: serverUrl ≠ issuerUrl.  openid-client's Issuer.discover
-        // would reject the response because the OIDC config's "issuer" field
-        // (http://localhost:8081/...) doesn't match the URL we asked
-        // (host.docker.internal:8081/...).  So we fetch the config ourselves
-        // and construct the Issuer manually.
-        const wellKnownUrl = `${serverUrl}/.well-known/openid-configuration`;
+        // Docker path: serverUrl ≠ issuerUrl. openid-client's Issuer.discover
+        // would reject the response because Keycloak (hostname-strict is off
+        // in dev) reflects whatever Host header the request used into EVERY
+        // URL in the config — issuer included — so asking via serverUrl gets
+        // back a config that claims to *be* serverUrl. Fetch it ourselves
+        // instead and rebuild the two kinds of URL correctly:
+        //   - issuer + authorization_endpoint must stay rooted at issuerUrl:
+        //     issuer must match the "iss" claim real tokens carry (minted
+        //     for the browser, which reaches Keycloak via issuerUrl, e.g.
+        //     localhost:8081 — never host.docker.internal), and
+        //     authorization_endpoint is where we redirect the *browser*,
+        //     which can't resolve a Docker-internal hostname either.
+        //   - token/userinfo/jwks endpoints stay rooted at serverUrl (already
+        //     correct as fetched — Keycloak reflected serverUrl into them
+        //     too) since those are calls our *server* makes for itself, from
+        //     inside the container where issuerUrl's host may not resolve.
+        const issuerOrigin = new URL(issuerUrl).origin;
+        const serverOrigin = new URL(serverUrl).origin;
+        const realmPath = new URL(issuerUrl).pathname; // e.g. /realms/azultech
+        const wellKnownUrl = `${serverOrigin}${realmPath}/.well-known/openid-configuration`;
+
         const resp = await fetch(wellKnownUrl);
         if (!resp.ok) throw new Error(`OIDC discovery failed: ${resp.status}`);
         const config = await resp.json();
 
-        // config.issuer is the real issuer Keycloak signs tokens with
-        // (e.g. http://localhost:8081/realms/azultech).
-        // The endpoint URLs in config.* are rooted at that issuer URL,
-        // which we CAN'T reach from inside Docker (localhost = ourselves).
-        // Rewrite them to use serverUrl so the HTTP calls actually work.
-        const rewriteBase = (url) =>
-          url?.replace(config.issuer, serverUrl);
-
         const issuer = new Issuer({
-          issuer: config.issuer,
-          authorization_endpoint: rewriteBase(config.authorization_endpoint),
-          token_endpoint: rewriteBase(config.token_endpoint),
-          userinfo_endpoint: rewriteBase(config.userinfo_endpoint),
-          jwks_uri: rewriteBase(config.jwks_uri),
+          issuer: issuerUrl,
+          authorization_endpoint: config.authorization_endpoint?.replace(serverOrigin, issuerOrigin),
+          token_endpoint: config.token_endpoint,
+          userinfo_endpoint: config.userinfo_endpoint,
+          jwks_uri: config.jwks_uri,
         });
 
         return new issuer.Client({
