@@ -20,6 +20,15 @@ services:
     # (copy server/.env.example first and fill in generated values).
     env_file:
       - ./server/.env
+    # Lets the container reach services on the host machine (e.g. a
+    # Keycloak/SSO stack published on the host's localhost:8081) via
+    # http://host.docker.internal:<port> — see KEYCLOAK_SERVER_URL in
+    # server/.env.example. Docker Desktop (Mac/Windows) already provides
+    # host.docker.internal without this; plain Linux Docker Engine (what a
+    # production server most likely runs) needs it spelled out explicitly.
+    # Harmless to leave in either way.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - hrm-data:/app/server/data        # SQLite database
       - hrm-storage:/app/server/storage  # encrypted document files
