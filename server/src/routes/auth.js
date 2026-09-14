@@ -170,10 +170,43 @@ router.get('/sso/callback', async (req, res) => {
   const email = (claims.email || '').toLowerCase();
   if (!email) return res.redirect('/login?sso_error=no_email');
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user || !user.active) {
-    writeAuditLog(null, 'login_failed_sso', 'user', null, { email });
-    return res.redirect('/login?sso_error=no_account');
+  let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+  // An Admin deliberately disabling a login must still be respected — SSO
+  // never reactivates one.
+  if (user && !user.active) {
+    writeAuditLog(user.id, 'login_failed_sso', 'user', user.id, { email, reason: 'disabled' });
+    return res.redirect('/login?sso_error=disabled');
+  }
+
+  if (!user) {
+    // First time this person has used SSO and there's no HRM login yet.
+    // Auto-provision them, but ONLY at the lowest tier: role is always
+    // 'employee' here, never hr/admin — that access is still always a
+    // deliberate grant an Admin makes afterwards in User Accounts, exactly
+    // as it works for someone Admin creates by hand. This just removes the
+    // need for HR to pre-create a login for every single person before they
+    // can see their own basic profile, which is all an Employee login is
+    // for anyway (see README "Access model").
+    //
+    // Gated on the account having actually finished onboarding in Keycloak
+    // (a verified email) — a Keycloak account that's still mid-setup
+    // doesn't get an HRM login yet either.
+    if (!claims.email_verified) {
+      return res.redirect('/login?sso_error=not_verified');
+    }
+
+    const name =
+      (claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(' ') || email).slice(0, 200);
+    // No one ever sees or uses this password — the account only ever signs
+    // in through SSO — so it's a random value satisfying the NOT NULL
+    // column, not a credential anyone needs to know.
+    const password_hash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 12);
+    const info = db
+      .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
+      .run(name, email, password_hash, 'employee');
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
+    writeAuditLog(user.id, 'user_created_via_sso', 'user', user.id, { email });
   }
 
   setSessionCookie(res, user);
