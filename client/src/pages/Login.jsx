@@ -8,7 +8,8 @@ import { MailIcon, LockIcon } from '../components/Icons';
 // Shown for ?sso_error=<code> on the way back from a failed/aborted SSO
 // attempt (server/src/routes/auth.js redirects here with one of these).
 const SSO_ERROR_MESSAGES = {
-  no_account: "Your Azul Tech SSO account isn't linked to an HRM login. Ask your Admin to create one for you first.",
+  disabled: 'Your HRM login has been disabled. Contact your Admin.',
+  not_verified: 'Finish verifying your email in Azul Tech Single Sign-On, then try again.',
   expired: 'That sign-in attempt expired. Please try "Continue with Azul Tech SSO" again.',
   failed: 'Azul Tech SSO sign-in failed. Please try again.',
   unavailable: 'Azul Tech SSO is temporarily unavailable. Please try again shortly, or sign in with your password.',
