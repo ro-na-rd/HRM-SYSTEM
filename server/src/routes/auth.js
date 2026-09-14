@@ -7,10 +7,12 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { z } = require('zod');
+const { generators } = require('openid-client');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
+const { ssoEnabled, getClient } = require('../lib/keycloakClient');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -46,16 +48,7 @@ router.post('/login', loginLimiter, (req, res) => {
   }
 
   // "Remember me" extends the session from 12 hours to 30 days.
-  const maxAge = remember ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
-  const token = jwt.sign({ sub: user.id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: remember ? '30d' : '12h',
-  });
-  res.cookie('hrm_token', token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production', // requires HTTPS in production
-    maxAge,
-  });
+  setSessionCookie(res, user, { remember });
 
   writeAuditLog(user.id, 'login_success', 'user', user.id);
   res.json({
@@ -65,6 +58,127 @@ router.post('/login', loginLimiter, (req, res) => {
     role: user.role,
     has_photo: !!user.photo_stored_filename,
   });
+});
+
+// --- Azul Tech SSO ("Continue with Azul Tech SSO") -----------------------
+//
+// SSO only ever signs a person into an HRM login that already exists,
+// matched by email — it never creates one. Every account (Admin, HR, or
+// Employee) is still created deliberately by an Admin in User Accounts,
+// exactly as before; SSO is just a second way to prove you are the person
+// that account belongs to. Entirely optional: if Keycloak isn't configured
+// (see server/.env.example), these two routes 404 and the login page shows
+// only the password form.
+//
+// The exchange with Keycloak (authorization code + PKCE, confidential
+// client secret) happens entirely server-side — the browser only ever sees
+// two redirects, never a Keycloak token. On success we mint the exact same
+// hrm_token cookie the password form does, so every other route in this app
+// (requireAuth, requireRole, all the Admin/HR/Employee checks) needs no
+// changes at all.
+const SSO_STATE_COOKIE = 'hrm_sso_state';
+const SSO_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+
+function setSessionCookie(res, user, { remember = false } = {}) {
+  const maxAge = remember ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
+  const token = jwt.sign({ sub: user.id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: remember ? '30d' : '12h',
+  });
+  res.cookie('hrm_token', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge,
+  });
+}
+
+router.get('/sso/status', (req, res) => {
+  res.json({ enabled: ssoEnabled() });
+});
+
+router.get('/sso/login', async (req, res) => {
+  if (!ssoEnabled()) return res.status(404).json({ error: 'SSO is not configured' });
+
+  let client;
+  try {
+    client = await getClient();
+  } catch {
+    return res.status(503).send('Could not reach the SSO server. Please try again shortly.');
+  }
+
+  const code_verifier = generators.codeVerifier();
+  const code_challenge = generators.codeChallenge(code_verifier);
+  const state = generators.state();
+
+  const authUrl = client.authorizationUrl({
+    scope: 'openid email profile',
+    code_challenge,
+    code_challenge_method: 'S256',
+    state,
+  });
+
+  // Short-lived, tamper-proof (signed with the same JWT_SECRET as sessions)
+  // cookie to carry the PKCE verifier + state across the redirect to
+  // Keycloak and back — never trust query params alone for these.
+  const pkce = jwt.sign({ state, code_verifier }, process.env.JWT_SECRET, { expiresIn: '10m' });
+  res.cookie(SSO_STATE_COOKIE, pkce, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: SSO_STATE_MAX_AGE_MS,
+  });
+  res.redirect(authUrl);
+});
+
+router.get('/sso/callback', async (req, res) => {
+  if (!ssoEnabled()) return res.status(404).send('SSO is not configured');
+
+  const raw = req.cookies?.[SSO_STATE_COOKIE];
+  res.clearCookie(SSO_STATE_COOKIE);
+  if (!raw) return res.redirect('/login?sso_error=expired');
+
+  let pkce;
+  try {
+    pkce = jwt.verify(raw, process.env.JWT_SECRET);
+  } catch {
+    return res.redirect('/login?sso_error=expired');
+  }
+
+  let client;
+  try {
+    client = await getClient();
+  } catch {
+    return res.redirect('/login?sso_error=unavailable');
+  }
+
+  let tokenSet;
+  try {
+    const params = client.callbackParams(req);
+    // client.callback() verifies the authorization code, the state, and the
+    // ID token's signature/issuer/audience/expiry against Keycloak's JWKS —
+    // this throws on any mismatch, so a forged or replayed callback fails here.
+    tokenSet = await client.callback(process.env.KEYCLOAK_REDIRECT_URI, params, {
+      state: pkce.state,
+      code_verifier: pkce.code_verifier,
+    });
+  } catch (err) {
+    console.error('SSO callback failed:', err.message);
+    return res.redirect('/login?sso_error=failed');
+  }
+
+  const claims = tokenSet.claims();
+  const email = (claims.email || '').toLowerCase();
+  if (!email) return res.redirect('/login?sso_error=no_email');
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  if (!user || !user.active) {
+    writeAuditLog(null, 'login_failed_sso', 'user', null, { email });
+    return res.redirect('/login?sso_error=no_account');
+  }
+
+  setSessionCookie(res, user);
+  writeAuditLog(user.id, 'login_success_sso', 'user', user.id);
+  res.redirect('/');
 });
 
 router.post('/logout', requireAuth, (req, res) => {
