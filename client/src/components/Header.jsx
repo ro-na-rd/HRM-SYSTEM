@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { timeAgo } from '../utils/timeAgo';
 import { MenuIcon, SearchIcon, BellIcon, LogOutIcon } from './Icons';
-import ChangePasswordModal from './ChangePasswordModal';
 import ChangePhotoModal from './ChangePhotoModal';
 
 export default function Header({ title, user, onOpenMobileMenu, onLogout, canSearchEmployees }) {
@@ -15,7 +14,6 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifs, setNotifs] = useState({ items: [], unread: 0 });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [showChangePhoto, setShowChangePhoto] = useState(false);
   const searchBoxRef = useRef(null);
   const notifRef = useRef(null);
@@ -201,15 +199,6 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
               >
                 Change profile photo
               </button>
-              <button
-                className="header-dropdown-item"
-                onClick={() => {
-                  setShowChangePassword(true);
-                  setShowProfileMenu(false);
-                }}
-              >
-                Change password
-              </button>
               <button className="header-dropdown-logout" onClick={onLogout}>
                 <LogOutIcon size={16} />
                 Log out
@@ -219,7 +208,6 @@ export default function Header({ title, user, onOpenMobileMenu, onLogout, canSea
         </div>
       </div>
 
-      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
       {showChangePhoto && <ChangePhotoModal onClose={() => setShowChangePhoto(false)} />}
     </header>
   );

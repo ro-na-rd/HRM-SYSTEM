@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import logo from '../assets/azul-tech-logo-white-transparent.png';
-import { MailIcon, LockIcon } from '../components/Icons';
 
 // Shown for ?sso_error=<code> on the way back from a failed/aborted SSO
 // attempt (server/src/routes/auth.js redirects here with one of these).
@@ -12,20 +10,14 @@ const SSO_ERROR_MESSAGES = {
   not_verified: 'Finish verifying your email in Azul Tech Single Sign-On, then try again.',
   expired: 'That sign-in attempt expired. Please try "Continue with Azul Tech SSO" again.',
   failed: 'Azul Tech SSO sign-in failed. Please try again.',
-  unavailable: 'Azul Tech SSO is temporarily unavailable. Please try again shortly, or sign in with your password.',
+  unavailable: 'Azul Tech SSO is temporarily unavailable. Please try again shortly.',
   no_email: "Your Azul Tech account doesn't have an email address Keycloak can share. Ask your Admin for help.",
 };
 
 export default function Login() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [showForgotNote, setShowForgotNote] = useState(false);
   const [ssoEnabled, setSsoEnabled] = useState(false);
 
   useEffect(() => {
@@ -51,11 +43,12 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const user = await login(email, password, remember);
-      navigate(user.role === 'employee' ? '/employee-dashboard' : '/dashboard');
+      if (!ssoEnabled) {
+        throw new Error('SSO is not configured. Please contact your administrator.');
+      }
+      window.location.href = '/api/auth/sso/login';
     } catch (err) {
       setError(err.message);
-    } finally {
       setSubmitting(false);
     }
   }
@@ -80,63 +73,18 @@ export default function Login() {
 
         {error && <div className="error-banner error-banner-dark">{error}</div>}
 
-        <div className="pill-input">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoFocus
-          />
-          <span className="pill-input-icon">
-            <MailIcon />
+        <div className="login-options-row" style={{ justifyContent: 'center' }}>
+          <span className="subtitle" style={{ textAlign: 'center' }}>
+            Single sign-on only
           </span>
         </div>
-
-        <div className="pill-input">
-          <input
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <span className="pill-input-icon">
-            <LockIcon />
-          </span>
-        </div>
-
-        <div className="login-options-row">
-          <label className="remember-checkbox">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            Remember me
-          </label>
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => setShowForgotNote((s) => !s)}
-          >
-            Forgot password?
-          </button>
-        </div>
-        {showForgotNote && (
-          <p className="forgot-note">Ask your Admin to reset it for you from User Accounts.</p>
-        )}
 
         <button type="submit" className="pill-submit" disabled={submitting}>
-          {submitting ? 'Signing in...' : 'Log in'}
+          {submitting ? 'Redirecting...' : 'Continue with Azul Tech SSO'}
         </button>
 
-        {ssoEnabled && (
-          <>
-            <div className="login-divider">
-              <span>or</span>
-            </div>
-            <button type="button" className="pill-submit-outline" onClick={ssoLogin}>
-              Continue with Azul Tech SSO
-            </button>
-          </>
+        {!ssoEnabled && (
+          <div className="error-banner error-banner-dark">SSO is not configured. Please contact your administrator.</div>
         )}
       </form>
     </div>

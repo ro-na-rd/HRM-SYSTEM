@@ -13,6 +13,7 @@ const { requireAuth } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
 const { ssoEnabled, getClient } = require('../lib/keycloakClient');
+const { extractGroupsFromClaims, resolveSsoRoleFromGroups, DEFAULT_SSO_ROLE } = require('../lib/ssoRoleMap');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -36,27 +37,13 @@ const loginSchema = z.object({
   remember: z.boolean().optional(),
 });
 
+// Legacy email/password login has been removed. HRM now requires Azul Tech
+// SSO for authentication. This file retains the old route as a temporary
+// compatibility stub to keep production rollback easy, but it is intentionally
+// disabled and no longer used by the app UI.
 router.post('/login', loginLimiter, (req, res) => {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Email and password are required' });
-  const { email, password, remember } = parsed.data;
-
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
-  if (!user || !user.active || !bcrypt.compareSync(password, user.password_hash)) {
-    writeAuditLog(user?.id ?? null, 'login_failed', 'user', user?.id ?? null, { email });
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
-
-  // "Remember me" extends the session from 12 hours to 30 days.
-  setSessionCookie(res, user, { remember });
-
-  writeAuditLog(user.id, 'login_success', 'user', user.id);
-  res.json({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    has_photo: !!user.photo_stored_filename,
+  return res.status(410).json({
+    error: 'This sign-in method is no longer available. Please use Continue with Azul Tech SSO.',
   });
 });
 
@@ -181,6 +168,16 @@ router.get('/sso/callback', async (req, res) => {
 
   const claims = tokenSet.claims();
   const email = (claims.email || '').toLowerCase();
+  const groups = extractGroupsFromClaims(claims);
+  const mappedRole = resolveSsoRoleFromGroups(groups);
+  console.info('[sso-role-map]', JSON.stringify({
+    email,
+    groups,
+    mappedRole,
+    defaultRole: DEFAULT_SSO_ROLE,
+    claimsKeys: Object.keys(claims || {}),
+  }));
+
   if (!email) return res.redirect('/login?sso_error=no_email');
 
   let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
@@ -215,20 +212,26 @@ router.get('/sso/callback', async (req, res) => {
     // in through SSO — so it's a random value satisfying the NOT NULL
     // column, not a credential anyone needs to know.
     const password_hash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 12);
-    const role = isBootstrapAdmin(email) ? 'admin' : 'employee';
+    const baseRole = mappedRole || DEFAULT_SSO_ROLE;
+    const role = isBootstrapAdmin(email) ? 'admin' : baseRole;
     const info = db
       .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
       .run(name, email, password_hash, role);
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
-    writeAuditLog(user.id, 'user_created_via_sso', 'user', user.id, { email, role });
-  } else if (user.role !== 'admin' && isBootstrapAdmin(email)) {
-    // An existing (non-admin) account whose email is on the bootstrap list —
-    // promote on this login. Only ever raises the role, never lowers it,
-    // and only does anything the first time (once they're 'admin', this
-    // branch never fires for them again regardless of the env var).
-    db.prepare('UPDATE users SET role = ? WHERE id = ?').run('admin', user.id);
-    user.role = 'admin';
-    writeAuditLog(user.id, 'user_promoted_via_sso', 'user', user.id, { email, role: 'admin' });
+    writeAuditLog(user.id, 'user_created_via_sso', 'user', user.id, { email, role, groups, mappedRole });
+  } else {
+    const nextRole = isBootstrapAdmin(email) ? 'admin' : mappedRole || DEFAULT_SSO_ROLE;
+    if (user.role !== nextRole) {
+      db.prepare('UPDATE users SET role = ? WHERE id = ?').run(nextRole, user.id);
+      writeAuditLog(user.id, 'user_role_synced_via_sso', 'user', user.id, {
+        email,
+        previousRole: user.role,
+        nextRole,
+        groups,
+        mappedRole,
+      });
+      user.role = nextRole;
+    }
   }
 
   setSessionCookie(res, user);
@@ -262,20 +265,9 @@ const changePasswordSchema = z.object({
 // Self-service password change — any logged-in user (Admin, HR, or Employee)
 // can change their own password once they know their current one.
 router.patch('/password', requireAuth, changePasswordLimiter, (req, res) => {
-  const parsed = changePasswordSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
-  const { currentPassword, newPassword } = parsed.data;
-
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
-  if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
-    return res.status(401).json({ error: 'Current password is incorrect' });
-  }
-
-  const password_hash = bcrypt.hashSync(newPassword, 12);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(password_hash, req.user.id);
-
-  writeAuditLog(req.user.id, 'password_changed', 'user', req.user.id);
-  res.json({ ok: true });
+  return res.status(410).json({
+    error: 'Password changes are disabled. Please use Azul Tech SSO to sign in and manage access in the identity provider.',
+  });
 });
 
 // Account photo, shown in the header avatar - available to any logged-in
