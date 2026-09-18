@@ -47,13 +47,6 @@ export default function EmployeeDashboard() {
     <Layout title={`Welcome, ${firstName}! \u{1F44B}`}>
       {error && <div className="error-banner">{error}</div>}
 
-      {!employee && (
-        <p className="hint">
-          Your login isn’t linked to an employee record yet, so some of this will be empty. Ask your Admin to link
-          it in Employees.
-        </p>
-      )}
-
       <div className="stat-grid">
         <div className="stat-card">
           <span className="stat-icon stat-icon-blue">

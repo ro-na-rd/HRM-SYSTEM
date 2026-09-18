@@ -1,4 +1,4 @@
-# Azul Tech People
+# People
 
 An HR document management system for Azul Tech. It can run two ways:
 

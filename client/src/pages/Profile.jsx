@@ -213,10 +213,7 @@ function ProfilePanel({ employee, onChanged }) {
           </button>
         </form>
       ) : (
-        <p className="hint">
-          Your login isn’t linked to an employee record yet, so there's no personal information to show. Ask your
-          Admin to link it in Employees.
-        </p>
+        <p className="empty-row">No personal information available yet.</p>
       )}
     </>
   );
@@ -250,12 +247,7 @@ function LeavePanel({ hasEmployeeRecord }) {
   }
 
   if (!hasEmployeeRecord) {
-    return (
-      <p className="hint">
-        Your login isn’t linked to an employee record yet, so you can’t request leave. Ask your Admin to link your
-        account.
-      </p>
-    );
+    return <p className="empty-row">No leave requests available yet.</p>;
   }
 
   const pendingCount = rows.filter((r) => r.status === 'pending').length;
@@ -392,12 +384,7 @@ function LettersPanel({ hasEmployeeRecord }) {
   }
 
   if (!hasEmployeeRecord) {
-    return (
-      <p className="hint">
-        Your login isn’t linked to an employee record yet, so you can’t send letters. Ask your Admin to link your
-        account.
-      </p>
-    );
+    return <p className="empty-row">No letters available yet.</p>;
   }
 
   return (

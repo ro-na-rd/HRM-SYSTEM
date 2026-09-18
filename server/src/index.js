@@ -53,6 +53,7 @@ if (!isProduction) {
 
 app.use(express.json());
 app.use(cookieParser());
+app.use('/brand-assets', express.static(__dirname));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

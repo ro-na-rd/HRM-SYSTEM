@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import logo from '../assets/azul-tech-logo-white-transparent.png';
+import BrandLogo from './BrandLogo';
 import {
   DashboardIcon,
   EmployeesIcon,
@@ -58,9 +58,8 @@ export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onClo
       <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'sidebar-mobile-open' : ''}`}>
         <div className="sidebar-logo-row">
           <span className="sidebar-logo-chip">
-            <img src={logo} alt="Azul Tech" className="sidebar-logo" />
+            <BrandLogo className="sidebar-logo" />
           </span>
-          {!collapsed && <span className="sidebar-logo-suffix">People</span>}
         </div>
 
         <nav className="sidebar-nav">
