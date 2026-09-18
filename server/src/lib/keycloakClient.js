@@ -63,10 +63,11 @@ function getClient() {
         //     localhost:8081 — never host.docker.internal), and
         //     authorization_endpoint is where we redirect the *browser*,
         //     which can't resolve a Docker-internal hostname either.
-        //   - token/userinfo/jwks endpoints stay rooted at serverUrl (already
-        //     correct as fetched — Keycloak reflected serverUrl into them
-        //     too) since those are calls our *server* makes for itself, from
-        //     inside the container where issuerUrl's host may not resolve.
+        //   - token/userinfo/jwks endpoints must be rooted at serverUrl since
+        //     those are calls our *server* makes for itself, from inside the
+        //     container where issuerUrl's host may not resolve. Keycloak may
+        //     still advertise the public hostname in discovery, so rewrite
+        //     every server-side endpoint explicitly.
         const issuerOrigin = new URL(issuerUrl).origin;
         const serverOrigin = new URL(serverUrl).origin;
         const realmPath = new URL(issuerUrl).pathname; // e.g. /realms/azultech
@@ -79,9 +80,9 @@ function getClient() {
         const issuer = new Issuer({
           issuer: issuerUrl,
           authorization_endpoint: config.authorization_endpoint?.replace(serverOrigin, issuerOrigin),
-          token_endpoint: config.token_endpoint,
-          userinfo_endpoint: config.userinfo_endpoint,
-          jwks_uri: config.jwks_uri,
+          token_endpoint: config.token_endpoint?.replace(issuerOrigin, serverOrigin),
+          userinfo_endpoint: config.userinfo_endpoint?.replace(issuerOrigin, serverOrigin),
+          jwks_uri: config.jwks_uri?.replace(issuerOrigin, serverOrigin),
         });
 
         return new issuer.Client({
