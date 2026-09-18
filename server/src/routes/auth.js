@@ -64,7 +64,36 @@ router.post('/login', loginLimiter, (req, res) => {
 // (requireAuth, requireRole, all the Admin/HR/Employee checks) needs no
 // changes at all.
 const SSO_STATE_COOKIE = 'hrm_sso_state';
+const SSO_ID_TOKEN_COOKIE = 'hrm_sso_id_token';
 const SSO_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+
+function sessionCookieOptions(maxAge) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge,
+    path: '/',
+  };
+}
+
+function encodeIdToken(idToken) {
+  const { ciphertext, iv, authTag } = encryptBuffer(Buffer.from(idToken, 'utf8'));
+  return Buffer.from(JSON.stringify({ ciphertext: ciphertext.toString('base64'), iv, authTag })).toString('base64url');
+}
+
+function decodeIdToken(value) {
+  try {
+    const { ciphertext, iv, authTag } = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'));
+    return decryptBuffer(Buffer.from(ciphertext, 'base64'), iv, authTag).toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+function postLogoutRedirectUri() {
+  return process.env.KEYCLOAK_POST_LOGOUT_REDIRECT_URI || new URL('/login', process.env.KEYCLOAK_REDIRECT_URI).toString();
+}
 
 // Comma-separated emails that should start as (or be promoted to) 'admin'
 // the moment they sign in via SSO, rather than the default 'employee' —
@@ -235,14 +264,35 @@ router.get('/sso/callback', async (req, res) => {
   }
 
   setSessionCookie(res, user);
+  if (tokenSet.id_token) {
+    res.cookie(SSO_ID_TOKEN_COOKIE, encodeIdToken(tokenSet.id_token), sessionCookieOptions(12 * 60 * 60 * 1000));
+  }
   writeAuditLog(user.id, 'login_success_sso', 'user', user.id);
   res.redirect('/');
 });
 
-router.post('/logout', requireAuth, (req, res) => {
-  writeAuditLog(req.user.id, 'logout', 'user', req.user.id);
-  res.clearCookie('hrm_token');
-  res.json({ ok: true });
+router.post('/logout', async (req, res) => {
+  if (req.user) writeAuditLog(req.user.id, 'logout', 'user', req.user.id);
+
+  const idToken = req.cookies?.[SSO_ID_TOKEN_COOKIE] ? decodeIdToken(req.cookies[SSO_ID_TOKEN_COOKIE]) : null;
+  res.clearCookie('hrm_token', { path: '/' });
+  res.clearCookie(SSO_ID_TOKEN_COOKIE, { path: '/' });
+  res.clearCookie(SSO_STATE_COOKIE, { path: '/' });
+
+  if (!ssoEnabled()) return res.json({ ok: true, logoutUrl: '/login' });
+
+  try {
+    const client = await getClient();
+    const logoutUrl = client.endSessionUrl({
+      ...(idToken ? { id_token_hint: idToken } : {}),
+      client_id: process.env.KEYCLOAK_CLIENT_ID,
+      post_logout_redirect_uri: postLogoutRedirectUri(),
+    });
+    return res.json({ ok: true, logoutUrl });
+  } catch (err) {
+    console.error('SSO logout URL creation failed:', err.message);
+    return res.status(503).json({ error: 'Could not complete SSO logout. Please try again.' });
+  }
 });
 
 router.get('/me', requireAuth, (req, res) => {

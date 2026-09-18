@@ -82,6 +82,7 @@ function getClient() {
           token_endpoint: config.token_endpoint,
           userinfo_endpoint: config.userinfo_endpoint,
           jwks_uri: config.jwks_uri,
+          end_session_endpoint: config.end_session_endpoint?.replace(serverOrigin, issuerOrigin),
         });
 
         return new issuer.Client({

@@ -46,8 +46,12 @@ export default function Layout({ children, title }) {
   }, [location.pathname]);
 
   async function handleLogout() {
-    await logout();
-    navigate('/login');
+    try {
+      const logoutUrl = await logout();
+      window.location.href = logoutUrl || '/login';
+    } catch {
+      window.location.href = '/login';
+    }
   }
 
   const resolvedTitle = title || TITLES[location.pathname] || 'Employees';

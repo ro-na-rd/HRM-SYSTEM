@@ -25,8 +25,12 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
-    await api.post('/auth/logout', {});
-    setUser(null);
+    try {
+      const result = await api.post('/auth/logout', {});
+      return result.logoutUrl;
+    } finally {
+      setUser(null);
+    }
   }
 
   return <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>{children}</AuthContext.Provider>;

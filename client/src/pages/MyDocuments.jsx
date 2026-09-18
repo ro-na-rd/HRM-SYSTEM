@@ -87,10 +87,7 @@ export default function MyDocuments() {
   if (!employeeId) {
     return (
       <Layout title="My Documents">
-        <p className="hint">
-          Your login isn’t linked to an employee record yet, so there are no documents to show. Ask your Admin to
-          link it in Employees.
-        </p>
+        <p className="empty-row">No documents available yet.</p>
       </Layout>
     );
   }

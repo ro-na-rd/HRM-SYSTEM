@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import logo from '../assets/azul-tech-logo-white-transparent.png';
+import BrandLogo from '../components/BrandLogo';
 
 // Shown for ?sso_error=<code> on the way back from a failed/aborted SSO
 // attempt (server/src/routes/auth.js redirects here with one of these).
@@ -55,38 +55,44 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-page-bg" aria-hidden="true" />
-      <div className="login-corner-brand">
-        <span className="brand-logo-chip">
-          <img src={logo} alt="Azul Tech" />
-        </span>
-        <span className="brand-suffix">People</span>
+      <div className="login-visual" aria-label="People team collaborating">
+        <img src="/brand-assets/happy%20people.jpg" alt="People team collaborating in an office" />
+        <div className="login-visual-overlay" />
+        <div className="login-visual-copy">
+          <span className="login-eyebrow">Human Resource Management System</span>
+          <h1>Great work starts with people.</h1>
+          <p>Connect your teams, support your people, and keep every part of work moving.</p>
+        </div>
       </div>
 
-      <form className="login-glass-card" onSubmit={handleSubmit}>
-        <div className="login-glass-heading">
-          <span className="brand-logo-chip brand-logo-chip-lg">
-            <img src={logo} alt="Azul Tech" />
-          </span>
-          <p className="subtitle">People Management System</p>
-        </div>
+      <div className="login-panel">
+        <form className="login-card" onSubmit={handleSubmit}>
+          <div className="login-glass-heading">
+            <BrandLogo className="login-logo" />
+            <h2>People</h2>
+            <p className="login-subtitle">Human Resource Management System</p>
+            <h1 className="login-welcome">Welcome back</h1>
+          </div>
 
-        {error && <div className="error-banner error-banner-dark">{error}</div>}
+          {error && <div className="error-banner error-banner-dark">{error}</div>}
 
-        <div className="login-options-row" style={{ justifyContent: 'center' }}>
-          <span className="subtitle" style={{ textAlign: 'center' }}>
-            Single sign-on only
-          </span>
-        </div>
+          <p className="login-footer">Secured with Azul Tech single sign-on</p>
+          <p className="login-sso-note">Single sign-on only</p>
 
-        <button type="submit" className="pill-submit" disabled={submitting}>
-          {submitting ? 'Redirecting...' : 'Continue with Azul Tech SSO'}
-        </button>
+          <button type="submit" className="pill-submit" disabled={submitting}>
+            {submitting ? 'Redirecting...' : 'Continue with Azul Tech SSO'}
+          </button>
 
-        {!ssoEnabled && (
-          <div className="error-banner error-banner-dark">SSO is not configured. Please contact your administrator.</div>
-        )}
-      </form>
+          <p className="login-account-copy">Sign in with your @azultech.rw Azul Tech account.</p>
+
+          {!ssoEnabled && (
+            <div className="error-banner error-banner-dark">SSO is not configured. Please contact your administrator.</div>
+          )}
+          <div className="login-bottom-footer">
+            <p className="login-copyright">© 2026 Azul Tech. All rights reserved.</p>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
