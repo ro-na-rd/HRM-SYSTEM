@@ -69,7 +69,7 @@ export default function Login() {
         <form className="login-card" onSubmit={handleSubmit}>
           <div className="login-glass-heading">
             <BrandLogo className="login-logo" />
-            <h2>People</h2>
+
             <p className="login-subtitle">Human Resource Management System</p>
             <h1 className="login-welcome">Welcome back</h1>
           </div>
