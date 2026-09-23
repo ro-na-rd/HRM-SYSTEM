@@ -8,6 +8,7 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
+const { findOrCreateOwnEmployeeId } = require('../lib/selfService');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -32,13 +33,14 @@ const SAFE_COLUMNS_PREFIXED = `e.id, e.full_name, e.department, e.position, e.hi
   (e.photo_stored_filename IS NOT NULL) AS has_photo, m.full_name AS manager_name`;
 
 function findOwnEmployeeId(userId) {
-  const employee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
-  return employee ? employee.id : null;
+  return findOrCreateOwnEmployeeId(userId);
 }
 
-// Admin/HR see the full roster. Employees may only see their own linked record.
+// Admin/HR see the full roster. Employees may only see their own record -
+// auto-created on first use if HR hasn't linked them yet.
 router.get('/', (req, res) => {
   if (req.user.role === 'employee') {
+    findOrCreateOwnEmployeeId(req.user.id);
     const own = db
       .prepare(
         `SELECT ${SAFE_COLUMNS_PREFIXED} FROM employees e LEFT JOIN employees m ON m.id = e.manager_id

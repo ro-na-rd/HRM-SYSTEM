@@ -9,6 +9,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
 const { notifyStaff, notifyEmployee } = require('../lib/notify');
+const { findOrCreateOwnEmployeeId } = require('../lib/selfService');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -21,8 +22,7 @@ const upload = multer({
 router.use(requireAuth);
 
 function findOwnEmployeeId(userId) {
-  const employee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
-  return employee ? employee.id : null;
+  return findOrCreateOwnEmployeeId(userId);
 }
 
 // Columns safe to send to the client - never the stored filename, IV, or
