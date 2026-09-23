@@ -4,13 +4,13 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { writeAuditLog } = require('../lib/audit');
 const { notifyEmployee } = require('../lib/notify');
+const { findOrCreateOwnEmployeeId } = require('../lib/selfService');
 
 const router = express.Router();
 router.use(requireAuth);
 
 function findOwnEmployeeId(userId) {
-  const e = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
-  return e ? e.id : null;
+  return findOrCreateOwnEmployeeId(userId);
 }
 
 function isStaff(req) {

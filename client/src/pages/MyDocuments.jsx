@@ -19,12 +19,15 @@ export default function MyDocuments() {
   const [employeeId, setEmployeeId] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [category, setCategory] = useState('id_document');
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
 
   function load() {
+    setLoading(true);
+    setError('');
     api
       .get('/employees')
       .then((rows) => {
@@ -34,7 +37,8 @@ export default function MyDocuments() {
           api.get(`/documents/employee/${own.id}`).then(setDocuments).catch((e) => setError(e.message));
         }
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
@@ -76,7 +80,7 @@ export default function MyDocuments() {
     }
   }
 
-  if (employeeId === null && !error) {
+  if (loading) {
     return (
       <Layout title="My Documents">
         <p>Loading...</p>
@@ -87,7 +91,7 @@ export default function MyDocuments() {
   if (!employeeId) {
     return (
       <Layout title="My Documents">
-        <p className="empty-row">No documents available yet.</p>
+        <p className="empty-row">No employee profile available yet. Refresh in a moment — if it persists, contact your Admin.</p>
       </Layout>
     );
   }

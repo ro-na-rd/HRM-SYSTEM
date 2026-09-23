@@ -4,14 +4,14 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { writeAuditLog } = require('../lib/audit');
 const { notifyStaff, notifyEmployee } = require('../lib/notify');
+const { findOrCreateOwnEmployeeId } = require('../lib/selfService');
 
 const router = express.Router();
 
 router.use(requireAuth);
 
 function findOwnEmployeeId(userId) {
-  const employee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(userId);
-  return employee ? employee.id : null;
+  return findOrCreateOwnEmployeeId(userId);
 }
 
 // Admin/HR see everyone's requests. Employees see only their own.

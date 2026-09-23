@@ -247,7 +247,11 @@ function LeavePanel({ hasEmployeeRecord }) {
   }
 
   if (!hasEmployeeRecord) {
-    return <p className="empty-row">No leave requests available yet.</p>;
+    return (
+      <p className="empty-row">
+        Leave will be available here shortly. If this message persists, contact your Admin.
+      </p>
+    );
   }
 
   const pendingCount = rows.filter((r) => r.status === 'pending').length;
