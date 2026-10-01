@@ -35,14 +35,15 @@ function isStaff(req) {
   return req.user.role === 'admin' || req.user.role === 'hr';
 }
 
-// Company-wide document list (all employees) - Admin/HR only.
+// Every document (all employees' files plus company documents) - Admin/HR
+// only. Company documents have employee_id/employee_name = null.
 router.get('/', requireRole('admin', 'hr'), (req, res) => {
   const docs = db
     .prepare(
       `SELECT d.id, d.employee_id, e.full_name AS employee_name, d.category, d.original_filename,
               d.mime_type, d.size, d.created_at
        FROM documents d
-       JOIN employees e ON e.id = d.employee_id
+       LEFT JOIN employees e ON e.id = d.employee_id
        ORDER BY d.created_at DESC`
     )
     .all();
@@ -86,6 +87,36 @@ router.post('/employee/:employeeId', upload.single('file'), (req, res) => {
     });
   }
 
+  const created = storeDocument(req, employeeId, category);
+
+  // Only tell the employee when HR/Admin added something to their file -
+  // not when the employee uploaded it themselves.
+  if (staff) {
+    notifyEmployee(employeeId, {
+      type: 'document',
+      title: 'A document was added to your file',
+      body: req.file.originalname,
+      link: '/profile/documents',
+    });
+  }
+
+  res.status(201).json(created);
+});
+
+// Company document: filed by HR/Admin without choosing an employee. Not in
+// anyone's file, so no employee can see it and nobody is notified.
+router.post('/company', requireRole('admin', 'hr'), upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  const category = req.body.category;
+  if (!CATEGORIES.includes(category)) {
+    return res.status(400).json({ error: `Category must be one of: ${CATEGORIES.join(', ')}` });
+  }
+  res.status(201).json(storeDocument(req, null, category));
+});
+
+// Encrypts the uploaded file to storage and records it. employeeId null =
+// company document.
+function storeDocument(req, employeeId, category) {
   const { ciphertext, iv, authTag } = encryptBuffer(req.file.buffer);
   const storedFilename = crypto.randomUUID();
   fs.writeFileSync(path.join(storageDir, storedFilename), ciphertext);
@@ -113,33 +144,23 @@ router.post('/employee/:employeeId', upload.single('file'), (req, res) => {
     filename: req.file.originalname,
   });
 
-  // Only tell the employee when HR/Admin added something to their file -
-  // not when the employee uploaded it themselves.
-  if (staff) {
-    notifyEmployee(employeeId, {
-      type: 'document',
-      title: 'A document was added to your file',
-      body: req.file.originalname,
-      link: '/profile/documents',
-    });
-  }
-
-  res.status(201).json({
+  return {
     id: info.lastInsertRowid,
     employee_id: employeeId,
     category,
     original_filename: req.file.originalname,
     mime_type: req.file.mimetype,
     size: req.file.size,
-  });
-});
+  };
+}
 
 function streamDocument(req, res, disposition) {
   const id = Number(req.params.id);
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
   if (!doc) return res.status(404).json({ error: 'Document not found' });
 
-  if (!isStaff(req) && findOwnEmployeeId(req.user.id) !== doc.employee_id) {
+  // Company documents (employee_id null) are staff-only.
+  if (!isStaff(req) && (doc.employee_id == null || findOwnEmployeeId(req.user.id) !== doc.employee_id)) {
     return res.status(403).json({ error: 'You do not have permission to view this document' });
   }
 

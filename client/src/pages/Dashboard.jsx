@@ -198,7 +198,7 @@ export default function Dashboard() {
                 <li key={d.id}>
                   <span className="activity-dot" />
                   <span className="activity-text">
-                    {d.original_filename} <em style={{ textTransform: 'none' }}>for {d.employee_name}</em>
+                    {d.original_filename} <em style={{ textTransform: 'none' }}>{d.employee_name ? `for ${d.employee_name}` : 'company document'}</em>
                   </span>
                   <em>{timeAgo(d.created_at)}</em>
                 </li>
