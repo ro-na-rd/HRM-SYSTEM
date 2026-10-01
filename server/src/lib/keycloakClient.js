@@ -17,6 +17,24 @@ function ssoEnabled() {
   );
 }
 
+// KEYCLOAK_REDIRECT_URI may be a single URL or a comma-separated list, e.g.
+//   http://localhost:5173/api/auth/sso/callback,http://localhost:4000/api/auth/sso/callback
+// so that BOTH `npm run dev` (Vite on :5173, proxied to the API) and
+// `docker compose up` (single container on :4000) work without editing .env.
+// Every entry must also be registered in Keycloak as a Valid Redirect URI —
+// Keycloak only accepts an exact match, which is what caused
+// "Invalid parameter: redirect_uri".
+function getRedirectUris() {
+  return (process.env.KEYCLOAK_REDIRECT_URI || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function getPrimaryRedirectUri() {
+  return getRedirectUris()[0] || process.env.KEYCLOAK_REDIRECT_URI;
+}
+
 let clientPromise = null;
 
 // Discovers the realm's OIDC configuration once (network call to Keycloak)
@@ -46,7 +64,7 @@ function getClient() {
           return new issuer.Client({
             client_id: process.env.KEYCLOAK_CLIENT_ID,
             client_secret: process.env.KEYCLOAK_CLIENT_SECRET,
-            redirect_uris: [process.env.KEYCLOAK_REDIRECT_URI],
+            redirect_uris: getRedirectUris(),
             response_types: ['code'],
           });
         }
@@ -89,7 +107,7 @@ function getClient() {
         return new issuer.Client({
           client_id: process.env.KEYCLOAK_CLIENT_ID,
           client_secret: process.env.KEYCLOAK_CLIENT_SECRET,
-          redirect_uris: [process.env.KEYCLOAK_REDIRECT_URI],
+          redirect_uris: getRedirectUris(),
           response_types: ['code'],
         });
       } catch (discoveryErr) {
@@ -106,4 +124,4 @@ function getClient() {
   return clientPromise;
 }
 
-module.exports = { ssoEnabled, getClient };
+module.exports = { ssoEnabled, getClient, getRedirectUris, getPrimaryRedirectUri };

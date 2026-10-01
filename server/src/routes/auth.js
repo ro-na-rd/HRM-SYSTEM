@@ -12,7 +12,7 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
-const { ssoEnabled, getClient } = require('../lib/keycloakClient');
+const { ssoEnabled, getClient, getRedirectUris, getPrimaryRedirectUri } = require('../lib/keycloakClient');
 const { extractGroupsFromClaims, resolveSsoRoleFromGroups, DEFAULT_SSO_ROLE } = require('../lib/ssoRoleMap');
 
 const router = express.Router();
@@ -37,13 +37,38 @@ const loginSchema = z.object({
   remember: z.boolean().optional(),
 });
 
-// Legacy email/password login has been removed. HRM now requires Azul Tech
-// SSO for authentication. This file retains the old route as a temporary
-// compatibility stub to keep production rollback easy, but it is intentionally
-// disabled and no longer used by the app UI.
+// Email/password login is the local-dev sign-in method. In production (SSO
+// configured via KEYCLOAK_* env vars) this route is intentionally disabled
+// and the UI only offers "Continue with Azul Tech SSO" — SSO is the only
+// production sign-in. Locally, leave the KEYCLOAK_* vars blank in
+// server/.env to disable SSO; then this route (and the password form in
+// Login.jsx) is active again so you can test without Keycloak running.
 router.post('/login', loginLimiter, (req, res) => {
-  return res.status(410).json({
-    error: 'This sign-in method is no longer available. Please use Continue with Azul Tech SSO.',
+  if (ssoEnabled()) {
+    return res.status(410).json({
+      error: 'This sign-in method is no longer available. Please use Continue with Azul Tech SSO.',
+    });
+  }
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Email and password are required' });
+  const { email, password, remember } = parsed.data;
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase());
+  if (!user || !user.active || !bcrypt.compareSync(password, user.password_hash)) {
+    writeAuditLog(user?.id ?? null, 'login_failed', 'user', user?.id ?? null, { email });
+    return res.status(401).json({ error: 'Invalid email or password' });
+  }
+
+  // "Remember me" extends the session from 12 hours to 30 days.
+  setSessionCookie(res, user, { remember, req });
+
+  writeAuditLog(user.id, 'login_success', 'user', user.id);
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    has_photo: !!user.photo_stored_filename,
   });
 });
 
@@ -67,11 +92,21 @@ const SSO_STATE_COOKIE = 'hrm_sso_state';
 const SSO_ID_TOKEN_COOKIE = 'hrm_sso_id_token';
 const SSO_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
-function sessionCookieOptions(maxAge) {
+function isHttps(req) {
+  if (!req) return process.env.NODE_ENV === 'production';
+  if (req.secure) return true;
+  const proto = (req.get('X-Forwarded-Proto') || '').split(',')[0].trim().toLowerCase();
+  return proto === 'https';
+}
+
+function sessionCookieOptions(maxAge, req) {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Secure only on real HTTPS — a blanket NODE_ENV check breaks local
+    // docker testing on http://localhost:4000 because browsers reject Secure
+    // cookies over HTTP (state + session cookies silently vanish).
+    secure: isHttps(req),
     maxAge,
     path: '/',
   };
@@ -91,8 +126,52 @@ function decodeIdToken(value) {
   }
 }
 
-function postLogoutRedirectUri() {
-  return process.env.KEYCLOAK_POST_LOGOUT_REDIRECT_URI || new URL('/login', process.env.KEYCLOAK_REDIRECT_URI).toString();
+function postLogoutRedirectUri(req) {
+  const configured = (process.env.KEYCLOAK_POST_LOGOUT_REDIRECT_URI || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (req && configured.length > 1) {
+    const hint = req.get('Referer') || req.get('Origin') || '';
+    const match = configured.find((u) => {
+      try {
+        return hint.startsWith(new URL(u).origin);
+      } catch {
+        return false;
+      }
+    });
+    if (match) return match;
+  }
+  return configured[0] || new URL('/login', getPrimaryRedirectUri()).toString();
+}
+
+// Picks which registered redirect URI to use for THIS login request, so
+// `npm run dev` (browser on :5173) and `docker compose up` (browser on :4000)
+// both work with one .env. Matches the request's page origin against the
+// allowlisted KEYCLOAK_REDIRECT_URI entries — never trusts an arbitrary
+// caller-supplied URL, so no open-redirect is possible.
+function pickRedirectUri(req) {
+  const allowlist = getRedirectUris();
+  const hint = req.get('Referer') || req.get('Origin') || '';
+  const match = allowlist.find((u) => {
+    try {
+      return hint.startsWith(new URL(u).origin);
+    } catch {
+      return false;
+    }
+  });
+  return match || getPrimaryRedirectUri();
+}
+
+// Where the browser should land after the callback. In dev the Keycloak
+// redirect comes back to the Vite origin (:5173, via proxy), so send the
+// browser there — a bare '/' would drop it on :4000 which serves no UI in dev.
+function appOriginForRedirectUri(redirectUri) {
+  try {
+    return new URL(redirectUri).origin;
+  } catch {
+    return '';
+  }
 }
 
 // Comma-separated emails that should start as (or be promoted to) 'admin'
@@ -108,7 +187,7 @@ function isBootstrapAdmin(email) {
     .includes(email);
 }
 
-function setSessionCookie(res, user, { remember = false } = {}) {
+function setSessionCookie(res, user, { remember = false, req = null } = {}) {
   const maxAge = remember ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
   const token = jwt.sign({ sub: user.id, role: user.role }, process.env.JWT_SECRET, {
     expiresIn: remember ? '30d' : '12h',
@@ -116,7 +195,7 @@ function setSessionCookie(res, user, { remember = false } = {}) {
   res.cookie('hrm_token', token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isHttps(req),
     maxAge,
   });
 }
@@ -139,7 +218,11 @@ router.get('/sso/login', async (req, res) => {
   const code_challenge = generators.codeChallenge(code_verifier);
   const state = generators.state();
 
+  // Use the redirect URI matching this browser's origin (:5173 in dev,
+  // :4000 in docker/prod) — Keycloak demands an exact registered match.
+  const redirect_uri = pickRedirectUri(req);
   const authUrl = client.authorizationUrl({
+    redirect_uri,
     scope: 'openid email profile',
     code_challenge,
     code_challenge_method: 'S256',
@@ -147,13 +230,13 @@ router.get('/sso/login', async (req, res) => {
   });
 
   // Short-lived, tamper-proof (signed with the same JWT_SECRET as sessions)
-  // cookie to carry the PKCE verifier + state across the redirect to
-  // Keycloak and back — never trust query params alone for these.
-  const pkce = jwt.sign({ state, code_verifier }, process.env.JWT_SECRET, { expiresIn: '10m' });
+  // cookie to carry the PKCE verifier + state + chosen redirect URI across
+  // the redirect to Keycloak and back — never trust query params alone.
+  const pkce = jwt.sign({ state, code_verifier, redirect_uri }, process.env.JWT_SECRET, { expiresIn: '10m' });
   res.cookie(SSO_STATE_COOKIE, pkce, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isHttps(req),
     maxAge: SSO_STATE_MAX_AGE_MS,
   });
   res.redirect(authUrl);
@@ -183,10 +266,15 @@ router.get('/sso/callback', async (req, res) => {
   let tokenSet;
   try {
     const params = client.callbackParams(req);
+    // Must be byte-identical to the redirect_uri sent in /sso/login —
+    // Keycloak and openid-client both reject anything else.
+    const allowlist = getRedirectUris();
+    const redirectUri =
+      pkce.redirect_uri && allowlist.includes(pkce.redirect_uri) ? pkce.redirect_uri : getPrimaryRedirectUri();
     // client.callback() verifies the authorization code, the state, and the
     // ID token's signature/issuer/audience/expiry against Keycloak's JWKS —
     // this throws on any mismatch, so a forged or replayed callback fails here.
-    tokenSet = await client.callback(process.env.KEYCLOAK_REDIRECT_URI, params, {
+    tokenSet = await client.callback(redirectUri, params, {
       state: pkce.state,
       code_verifier: pkce.code_verifier,
     });
@@ -263,12 +351,17 @@ router.get('/sso/callback', async (req, res) => {
     }
   }
 
-  setSessionCookie(res, user);
+  setSessionCookie(res, user, { req });
   if (tokenSet.id_token) {
-    res.cookie(SSO_ID_TOKEN_COOKIE, encodeIdToken(tokenSet.id_token), sessionCookieOptions(12 * 60 * 60 * 1000));
+    res.cookie(SSO_ID_TOKEN_COOKIE, encodeIdToken(tokenSet.id_token), sessionCookieOptions(12 * 60 * 60 * 1000, req));
   }
   writeAuditLog(user.id, 'login_success_sso', 'user', user.id);
-  res.redirect('/');
+  // Land back on the frontend origin the login started from (:5173 in dev
+  // via the Vite proxy, :4000 in docker/prod where the API serves the UI).
+  const allowlist = getRedirectUris();
+  const usedRedirect = pkce.redirect_uri && allowlist.includes(pkce.redirect_uri) ? pkce.redirect_uri : null;
+  const appOrigin = usedRedirect ? appOriginForRedirectUri(usedRedirect) : '';
+  res.redirect(appOrigin && !appOrigin.endsWith(':4000') ? `${appOrigin}/` : '/');
 });
 
 router.post('/logout', async (req, res) => {
@@ -286,7 +379,7 @@ router.post('/logout', async (req, res) => {
     const logoutUrl = client.endSessionUrl({
       ...(idToken ? { id_token_hint: idToken } : {}),
       client_id: process.env.KEYCLOAK_CLIENT_ID,
-      post_logout_redirect_uri: postLogoutRedirectUri(),
+      post_logout_redirect_uri: postLogoutRedirectUri(req),
     });
     return res.json({ ok: true, logoutUrl });
   } catch (err) {
@@ -314,10 +407,28 @@ const changePasswordSchema = z.object({
 
 // Self-service password change — any logged-in user (Admin, HR, or Employee)
 // can change their own password once they know their current one.
+// Disabled in production when SSO is configured (passwords live in the
+// identity provider there); enabled locally when SSO is off.
 router.patch('/password', requireAuth, changePasswordLimiter, (req, res) => {
-  return res.status(410).json({
-    error: 'Password changes are disabled. Please use Azul Tech SSO to sign in and manage access in the identity provider.',
-  });
+  if (ssoEnabled()) {
+    return res.status(410).json({
+      error: 'Password changes are disabled. Please use Azul Tech SSO to sign in and manage access in the identity provider.',
+    });
+  }
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const { currentPassword, newPassword } = parsed.data;
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  const password_hash = bcrypt.hashSync(newPassword, 12);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(password_hash, req.user.id);
+
+  writeAuditLog(req.user.id, 'password_changed', 'user', req.user.id);
+  res.json({ ok: true });
 });
 
 // Account photo, shown in the header avatar - available to any logged-in

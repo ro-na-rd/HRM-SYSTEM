@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 import { api } from '../api/client';
 import BrandLogo from '../components/BrandLogo';
 
@@ -15,16 +16,24 @@ const SSO_ERROR_MESSAGES = {
 };
 
 export default function Login() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showForgotNote, setShowForgotNote] = useState(false);
   const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [ssoChecked, setSsoChecked] = useState(false);
 
   useEffect(() => {
     api
       .get('/auth/sso/status')
       .then((s) => setSsoEnabled(!!s.enabled))
-      .catch(() => setSsoEnabled(false));
+      .catch(() => setSsoEnabled(false))
+      .finally(() => setSsoChecked(true));
 
     const ssoError = searchParams.get('sso_error');
     if (ssoError) setError(SSO_ERROR_MESSAGES[ssoError] || 'Azul Tech SSO sign-in failed. Please try again.');
@@ -43,10 +52,16 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      if (!ssoEnabled) {
-        throw new Error('SSO is not configured. Please contact your administrator.');
+      if (ssoEnabled) {
+        // Production: SSO-only, no password form is rendered in this mode —
+        // this submit comes from the "Continue with Azul Tech SSO" button.
+        window.location.href = '/api/auth/sso/login';
+        return;
       }
-      window.location.href = '/api/auth/sso/login';
+      // Local dev (SSO not configured): plain email/password sign-in so you
+      // can test without Keycloak running.
+      const user = await login(email, password, remember);
+      navigate(user.role === 'employee' ? '/employee-dashboard' : '/dashboard');
     } catch (err) {
       setError(err.message);
       setSubmitting(false);
@@ -76,17 +91,69 @@ export default function Login() {
 
           {error && <div className="error-banner error-banner-dark">{error}</div>}
 
-          <p className="login-footer">Secured with Azul Tech single sign-on</p>
-          <p className="login-sso-note">Single sign-on only</p>
+          {!ssoChecked ? (
+            <p className="login-account-copy">Checking sign-in options…</p>
+          ) : ssoEnabled ? (
+            <>
+              <p className="login-footer">Secured with Azul Tech single sign-on</p>
+              <p className="login-sso-note">Single sign-on only</p>
 
-          <button type="submit" className="pill-submit" disabled={submitting}>
-            {submitting ? 'Redirecting...' : 'Continue with Azul Tech SSO'}
-          </button>
+              <button type="submit" className="pill-submit" disabled={submitting}>
+                {submitting ? 'Redirecting...' : 'Continue with Azul Tech SSO'}
+              </button>
 
-          <p className="login-account-copy">Sign in with your @azultech.rw Azul Tech account.</p>
+              <p className="login-account-copy">Sign in with your @azultech.rw Azul Tech account.</p>
+            </>
+          ) : (
+            <>
+              <p className="login-footer">Local development sign-in</p>
 
-          {!ssoEnabled && (
-            <div className="error-banner error-banner-dark">SSO is not configured. Please contact your administrator.</div>
+              <div className="pill-input">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="pill-input">
+                <input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="login-options-row">
+                <label className="remember-checkbox">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                  Remember me
+                </label>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => setShowForgotNote((s) => !s)}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              {showForgotNote && (
+                <p className="forgot-note">Ask your Admin to reset it for you from User Accounts.</p>
+              )}
+
+              <button type="submit" className="pill-submit" disabled={submitting}>
+                {submitting ? 'Signing in...' : 'Log in'}
+              </button>
+
+              <p className="login-account-copy">
+                SSO is off locally — configure Keycloak to enable “Continue with Azul Tech SSO”.
+              </p>
+            </>
           )}
           <div className="login-bottom-footer">
             <p className="login-copyright">© 2026 Azul Tech. All rights reserved.</p>

@@ -1,0 +1,55 @@
+name: CI/CD Production
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Never run two deploys on the server at the same time.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest            # GitHub's cloud machine, not our server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22            # server needs >= 22.5 (node:sqlite)
+
+      - name: Server - install & test
+        working-directory: ./server
+        run: |
+          npm ci
+          npm test
+
+      - name: Client - install & build
+        working-directory: ./client
+        run: |
+          npm ci
+          npm run build
+
+  deploy:
+    needs: test                       # only deploys if tests/build pass
+    if: github.event_name == 'push'   # PRs are tested, never deployed
+    runs-on: [self-hosted, production]
+    steps:
+      - name: Deploy
+        # APP_DIR = the project folder on the server, set under
+        # Settings → Secrets and variables → Actions → Variables.
+        run: bash "${{ vars.APP_DIR }}/deploy.sh"
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS http://localhost:4000/api/health; then
+              echo; echo "App is up"; exit 0
+            fi
+            sleep 5
+          done
+          echo "App not responding!"
+          docker logs --tail 50 azul-tech-hrm || true
+          exit 1
