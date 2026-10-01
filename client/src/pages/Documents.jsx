@@ -11,12 +11,15 @@ const CATEGORY_LABELS = {
   other: 'Other',
 };
 
+const COMPANY_LABEL = 'Company';
+
 export default function Documents() {
   const [documents, setDocuments] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
+  const [owner, setOwner] = useState('all'); // all | company | employees
 
   const [employeeId, setEmployeeId] = useState('');
   const [category, setCategory] = useState('contract');
@@ -32,14 +35,15 @@ export default function Documents() {
 
   async function handleUpload(e) {
     e.preventDefault();
-    if (!file || !employeeId) return;
+    if (!file) return;
     setError('');
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('category', category);
-      await api.postForm(`/documents/employee/${employeeId}`, formData);
+      // No employee chosen = a company document, kept for HR/Admin only.
+      await api.postForm(employeeId ? `/documents/employee/${employeeId}` : '/documents/company', formData);
       setFile(null);
       setEmployeeId('');
       e.target.reset();
@@ -71,14 +75,16 @@ export default function Documents() {
   }
 
   const q = search.trim().toLowerCase();
-  const filtered = q
-    ? documents.filter(
-        (d) =>
-          d.employee_name.toLowerCase().includes(q) ||
-          d.original_filename.toLowerCase().includes(q) ||
-          (CATEGORY_LABELS[d.category] || d.category).toLowerCase().includes(q)
-      )
-    : documents;
+  const filtered = documents.filter((d) => {
+    if (owner === 'company' && d.employee_id != null) return false;
+    if (owner === 'employees' && d.employee_id == null) return false;
+    if (!q) return true;
+    return (
+      (d.employee_name || COMPANY_LABEL).toLowerCase().includes(q) ||
+      d.original_filename.toLowerCase().includes(q) ||
+      (CATEGORY_LABELS[d.category] || d.category).toLowerCase().includes(q)
+    );
+  });
 
   return (
     <Layout title="Documents">
@@ -97,16 +103,19 @@ export default function Documents() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <select value={owner} onChange={(e) => setOwner(e.target.value)} aria-label="Show documents">
+          <option value="all">All documents</option>
+          <option value="company">Company documents</option>
+          <option value="employees">Employee documents</option>
+        </select>
       </div>
 
       {error && <div className="error-banner">{error}</div>}
 
       {showForm && (
         <form className="card upload-form" onSubmit={handleUpload}>
-          <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} required>
-            <option value="" disabled>
-              Select employee
-            </option>
+          <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+            <option value="">Company document (no employee)</option>
             {employees.map((emp) => (
               <option key={emp.id} value={emp.id}>
                 {emp.full_name}
@@ -141,7 +150,7 @@ export default function Documents() {
           {filtered.map((doc) => (
             <tr key={doc.id}>
               <td>{doc.original_filename}</td>
-              <td>{doc.employee_name}</td>
+              <td>{doc.employee_name || <em>{COMPANY_LABEL}</em>}</td>
               <td>{CATEGORY_LABELS[doc.category] || doc.category}</td>
               <td>{new Date(doc.created_at).toLocaleString()}</td>
               <td className="actions-cell">
