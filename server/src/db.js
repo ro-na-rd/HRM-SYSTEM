@@ -38,7 +38,8 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    -- NULL = a company document (HR/Admin only, not in anyone's file).
+    employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
     uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     category TEXT NOT NULL CHECK (category IN ('contract', 'id_document', 'letter', 'certificate', 'other')),
     original_filename TEXT NOT NULL,
@@ -150,6 +151,39 @@ if (!employeeColumns.includes('date_of_birth')) {
     ALTER TABLE employees ADD COLUMN emergency_contact_name TEXT;
     ALTER TABLE employees ADD COLUMN emergency_contact_relationship TEXT;
     ALTER TABLE employees ADD COLUMN emergency_contact_phone TEXT;
+  `);
+}
+
+// Migration: company documents. HR can file a document without picking an
+// employee, so documents.employee_id becomes optional (NULL = company
+// document, HR/Admin only). SQLite can't drop a NOT NULL constraint in
+// place, so databases created before this rebuild the table once, keeping
+// every row and id as-is.
+const documentEmployeeCol = db
+  .prepare('PRAGMA table_info(documents)')
+  .all()
+  .find((c) => c.name === 'employee_id');
+if (documentEmployeeCol && documentEmployeeCol.notnull) {
+  const cols = 'id, employee_id, uploaded_by, category, original_filename, stored_filename, mime_type, size, iv, auth_tag, created_at';
+  db.exec(`
+    BEGIN;
+    CREATE TABLE documents_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
+      uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      category TEXT NOT NULL CHECK (category IN ('contract', 'id_document', 'letter', 'certificate', 'other')),
+      original_filename TEXT NOT NULL,
+      stored_filename TEXT NOT NULL,
+      mime_type TEXT,
+      size INTEGER,
+      iv TEXT NOT NULL,
+      auth_tag TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO documents_new (${cols}) SELECT ${cols} FROM documents;
+    DROP TABLE documents;
+    ALTER TABLE documents_new RENAME TO documents;
+    COMMIT;
   `);
 }
 
