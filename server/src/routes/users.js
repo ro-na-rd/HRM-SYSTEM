@@ -20,7 +20,7 @@ const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['admin', 'hr', 'employee']),
+  role: z.enum(['admin', 'hr', 'manager', 'employee']),
 });
 
 router.post('/', (req, res) => {
@@ -42,7 +42,7 @@ router.post('/', (req, res) => {
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
-  role: z.enum(['admin', 'hr', 'employee']).optional(),
+  role: z.enum(['admin', 'hr', 'manager', 'employee']).optional(),
   active: z.boolean().optional(),
   password: z.string().min(8).optional(),
 });

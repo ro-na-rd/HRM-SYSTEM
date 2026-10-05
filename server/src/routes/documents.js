@@ -67,7 +67,7 @@ router.get('/employee/:employeeId', (req, res) => {
 
 router.post('/employee/:employeeId', upload.single('file'), (req, res) => {
   const employeeId = Number(req.params.employeeId);
-  const employee = db.prepare('SELECT id FROM employees WHERE id = ?').get(employeeId);
+  const employee = db.prepare('SELECT id FROM employees WHERE id = ? AND managed_by IS NULL').get(employeeId);
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
 
   const staff = isStaff(req);

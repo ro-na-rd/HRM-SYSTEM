@@ -37,7 +37,6 @@ const NAV_ITEMS = [
 const EMPLOYEE_NAV_ITEMS = [
   { to: '/employee-dashboard', label: 'Dashboard', icon: DashboardIcon },
   { to: '/profile', label: 'My Profile', icon: ProfileIcon, end: true },
-  { to: '/profile/attendance', label: 'Attendance', icon: AttendanceIcon },
   { to: '/profile/leave', label: 'Leave', icon: LeaveIcon },
   { to: '/profile/documents', label: 'My Documents', icon: DocumentsIcon },
   { to: '/profile/letters', label: 'Letters', icon: MailIcon },
@@ -48,9 +47,17 @@ const EMPLOYEE_NAV_ITEMS = [
   { to: '/profile/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+// Team managers (e.g. Rose) keep their own team: no HR pages, no self-service.
+const MANAGER_NAV_ITEMS = [
+  { to: '/manager', label: 'Dashboard', icon: DashboardIcon, end: true },
+  { to: '/manager/employees', label: 'Employees', icon: EmployeesIcon },
+  { to: '/manager/attendance', label: 'Attendance', icon: AttendanceIcon },
+  { to: '/manager/leave', label: 'Leave Management', icon: LeaveIcon },
+];
+
 export default function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile, role }) {
   const showAdminItems = role === 'admin';
-  const navItems = role === 'employee' ? EMPLOYEE_NAV_ITEMS : NAV_ITEMS;
+  const navItems = role === 'employee' ? EMPLOYEE_NAV_ITEMS : role === 'manager' ? MANAGER_NAV_ITEMS : NAV_ITEMS;
 
   return (
     <>

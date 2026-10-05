@@ -3,11 +3,13 @@ const DEFAULT_SSO_ROLE = 'employee';
 const SSO_ROLE_GROUP_CONFIG = [
   { group: '/App-Access/people/Admin', role: 'admin', priority: 300 },
   { group: '/App-Access/people/HR', role: 'hr', priority: 220 },
+  { group: '/App-Access/people/Manager', role: 'manager', priority: 160 },
   { group: '/App-Access/people/Employee', role: 'employee', priority: 120 },
   { group: '/App-Access/people/Employees', role: 'employee', priority: 110 },
   { group: '/App-Access/HRM/SuperAdmins', role: 'admin', priority: 290 },
   { group: '/App-Access/HRM/Admins', role: 'admin', priority: 280 },
   { group: '/App-Access/HRM/HR', role: 'hr', priority: 210 },
+  { group: '/App-Access/HRM/Managers', role: 'manager', priority: 150 },
   { group: '/App-Access/HRM/Employees', role: 'employee', priority: 100 },
 ];
 
@@ -80,7 +82,20 @@ function resolveSsoRoleFromGroups(groups = []) {
   return getSsoRoleInfo(groups).role;
 }
 
+// MANAGER_EMAILS (comma-separated) turns those people into team managers
+// without a Keycloak group change. It only lifts the plain 'employee' role:
+// someone Keycloak maps to HR or Admin keeps that role.
+function applyManagerEmails(role, email, list = process.env.MANAGER_EMAILS) {
+  if (role !== 'employee' || !email) return role;
+  const managers = (list || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return managers.includes(String(email).toLowerCase()) ? 'manager' : role;
+}
+
 module.exports = {
+  applyManagerEmails,
   DEFAULT_SSO_ROLE,
   SSO_ROLE_GROUP_CONFIG,
   extractGroupsFromClaims,

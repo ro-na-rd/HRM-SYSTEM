@@ -22,6 +22,7 @@ router.get('/', (req, res) => {
         `SELECT lr.*, e.full_name AS employee_name, r.name AS reviewed_by_name
          FROM leave_requests lr JOIN employees e ON e.id = lr.employee_id
                                  LEFT JOIN users r ON r.id = lr.reviewed_by
+         WHERE e.managed_by IS NULL
          ORDER BY lr.created_at DESC`
       )
       .all();
@@ -93,7 +94,9 @@ const reviewSchema = z.object({
 
 router.patch('/:id/status', requireRole('admin', 'hr'), (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM leave_requests WHERE id = ?').get(id);
+  const existing = db.prepare(
+    'SELECT lr.* FROM leave_requests lr JOIN employees e ON e.id = lr.employee_id WHERE lr.id = ? AND e.managed_by IS NULL'
+  ).get(id);
   if (!existing) return res.status(404).json({ error: 'Leave request not found' });
 
   const parsed = reviewSchema.safeParse(req.body);

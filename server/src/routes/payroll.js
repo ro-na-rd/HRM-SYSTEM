@@ -47,7 +47,7 @@ router.get('/compensation', requireRole('admin', 'hr'), (req, res) => {
               c.currency, c.gross_salary, c.pay_frequency, c.effective_date, c.note, c.updated_at
        FROM employees e
        LEFT JOIN compensation c ON c.employee_id = e.id
-       WHERE e.active = 1
+       WHERE e.active = 1 AND e.managed_by IS NULL
        ORDER BY e.full_name ASC`
     )
     .all();
@@ -71,7 +71,7 @@ const compensationSchema = z.object({
 
 router.patch('/compensation/:employeeId', requireRole('admin', 'hr'), (req, res) => {
   const employeeId = Number(req.params.employeeId);
-  const employee = db.prepare('SELECT id FROM employees WHERE id = ?').get(employeeId);
+  const employee = db.prepare('SELECT id FROM employees WHERE id = ? AND managed_by IS NULL').get(employeeId);
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
 
   const parsed = compensationSchema.safeParse(req.body);
@@ -150,7 +150,7 @@ router.post('/payslips', requireRole('admin', 'hr'), upload.single('file'), (req
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const d = parsed.data;
 
-  const employee = db.prepare('SELECT id FROM employees WHERE id = ?').get(d.employee_id);
+  const employee = db.prepare('SELECT id FROM employees WHERE id = ? AND managed_by IS NULL').get(d.employee_id);
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
 
   const netPay = d.net_pay ?? Math.max(0, d.gross_pay - d.deductions);

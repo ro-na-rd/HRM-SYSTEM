@@ -18,7 +18,7 @@ db.exec(`
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'hr', 'employee')),
+    role TEXT NOT NULL CHECK (role IN ('admin', 'hr', 'manager', 'employee')),
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -152,6 +152,49 @@ if (!employeeColumns.includes('date_of_birth')) {
     ALTER TABLE employees ADD COLUMN emergency_contact_relationship TEXT;
     ALTER TABLE employees ADD COLUMN emergency_contact_phone TEXT;
   `);
+}
+
+// Migration: 'manager' role - a team manager (e.g. Rose) who keeps her own
+// team's roster, attendance and leave, separate from HR. SQLite can't
+// change a CHECK constraint in place, so older databases rebuild the users
+// table once (every column, row and id kept). Foreign keys are switched off
+// for the swap so dropping the old table doesn't cascade into other tables.
+const usersSql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").get().sql;
+if (!usersSql.includes("'manager'")) {
+  const newUsersSql = usersSql
+    .replace(/CREATE TABLE\s+(IF NOT EXISTS\s+)?"?users"?/i, 'CREATE TABLE users_new')
+    .replace("role IN ('admin', 'hr', 'employee')", "role IN ('admin', 'hr', 'manager', 'employee')");
+  const userCols = db
+    .prepare('PRAGMA table_info(users)')
+    .all()
+    .map((c) => c.name)
+    .join(', ');
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.exec(`
+      BEGIN;
+      ${newUsersSql};
+      INSERT INTO users_new (${userCols}) SELECT ${userCols} FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+      COMMIT;
+    `);
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      /* the failure happened before BEGIN took effect */
+    }
+    throw err;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+}
+
+// Migration: employees a manager keeps for her own team. managed_by = the
+// manager's user id; those people have no login and are hidden from HR/Admin.
+if (!employeeColumns.includes('managed_by')) {
+  db.exec(`ALTER TABLE employees ADD COLUMN managed_by INTEGER REFERENCES users(id) ON DELETE SET NULL;`);
 }
 
 // Migration: company documents. HR can file a document without picking an

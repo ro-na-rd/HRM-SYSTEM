@@ -20,6 +20,10 @@ const uploadPhoto = multer({
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 router.use(requireAuth);
+// Managers use /api/manager for their own team only, never the HR roster.
+router.use((req, res, next) =>
+  req.user.role === 'manager' ? res.status(403).json({ error: 'You do not have permission to do this' }) : next()
+);
 
 // Columns safe to send to the client - never the stored filename, IV, or
 // auth tag for the photo (internal storage details, not needed by the UI).
@@ -52,6 +56,7 @@ router.get('/', (req, res) => {
   const employees = db
     .prepare(
       `SELECT ${SAFE_COLUMNS_PREFIXED} FROM employees e LEFT JOIN employees m ON m.id = e.manager_id
+       WHERE e.managed_by IS NULL
        ORDER BY e.full_name ASC`
     )
     .all();
@@ -66,7 +71,7 @@ router.get('/meta', requireRole('admin', 'hr'), (req, res) => {
     db
       .prepare(
         `SELECT DISTINCT ${column} AS v FROM employees
-         WHERE ${column} IS NOT NULL AND TRIM(${column}) <> ''
+         WHERE managed_by IS NULL AND ${column} IS NOT NULL AND TRIM(${column}) <> ''
          ORDER BY ${column} COLLATE NOCASE`
       )
       .all()
@@ -77,7 +82,7 @@ router.get('/meta', requireRole('admin', 'hr'), (req, res) => {
   const positionsByDepartment = {};
   db.prepare(
     `SELECT DISTINCT department AS d, position AS p FROM employees
-     WHERE department IS NOT NULL AND TRIM(department) <> ''
+     WHERE managed_by IS NULL AND department IS NOT NULL AND TRIM(department) <> ''
        AND position IS NOT NULL AND TRIM(position) <> ''
      ORDER BY position COLLATE NOCASE`
   )
@@ -101,7 +106,7 @@ router.get('/:id', (req, res) => {
               m.full_name AS manager_name
        FROM employees e LEFT JOIN users u ON u.id = e.user_id
                          LEFT JOIN employees m ON m.id = e.manager_id
-       WHERE e.id = ?`
+       WHERE e.id = ? AND e.managed_by IS NULL`
     )
     .get(id);
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
@@ -219,7 +224,7 @@ router.post('/', requireRole('admin', 'hr'), (req, res) => {
 
 router.patch('/:id', requireRole('admin', 'hr'), (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM employees WHERE id = ? AND managed_by IS NULL').get(id);
   if (!existing) return res.status(404).json({ error: 'Employee not found' });
 
   const parsed = employeeSchema.partial().safeParse(req.body);
@@ -261,7 +266,7 @@ router.patch('/:id', requireRole('admin', 'hr'), (req, res) => {
 
 router.patch('/:id/status', requireRole('admin', 'hr'), (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM employees WHERE id = ? AND managed_by IS NULL').get(id);
   if (!existing) return res.status(404).json({ error: 'Employee not found' });
 
   const active = req.body.active ? 1 : 0;
@@ -278,7 +283,7 @@ function canManagePhoto(req, employeeId) {
 // Admin/HR can set any employee's photo; an Employee can only set their own.
 router.post('/:id/photo', uploadPhoto.single('photo'), (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM employees WHERE id = ? AND managed_by IS NULL').get(id);
   if (!existing) return res.status(404).json({ error: 'Employee not found' });
   if (!canManagePhoto(req, id)) {
     return res.status(403).json({ error: 'You do not have permission to change this photo' });
@@ -307,7 +312,7 @@ router.post('/:id/photo', uploadPhoto.single('photo'), (req, res) => {
 
 router.get('/:id/photo', (req, res) => {
   const id = Number(req.params.id);
-  const employee = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+  const employee = db.prepare('SELECT * FROM employees WHERE id = ? AND managed_by IS NULL').get(id);
   if (!employee || !employee.photo_stored_filename) return res.status(404).end();
 
   if (req.user.role === 'employee' && employee.user_id !== req.user.id) {
@@ -323,7 +328,7 @@ router.get('/:id/photo', (req, res) => {
 
 router.delete('/:id/photo', (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM employees WHERE id = ? AND managed_by IS NULL').get(id);
   if (!existing) return res.status(404).json({ error: 'Employee not found' });
   if (!canManagePhoto(req, id)) {
     return res.status(403).json({ error: 'You do not have permission to change this photo' });

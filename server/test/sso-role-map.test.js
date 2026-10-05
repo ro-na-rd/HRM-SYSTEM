@@ -21,3 +21,15 @@ test('uses precedence when multiple mapped groups are present', () => {
   const groups = extractGroupsFromClaims(claims);
   assert.equal(resolveSsoRoleFromGroups(groups), 'admin');
 });
+
+test('maps a Managers group to manager role', () => {
+  assert.equal(resolveSsoRoleFromGroups(['/App-Access/HRM/Managers']), 'manager');
+});
+
+test('MANAGER_EMAILS lifts only plain employees to manager', () => {
+  const { applyManagerEmails } = require('../src/lib/ssoRoleMap');
+  const list = 'rose.mukeshimana@azultech.rw, other@azultech.rw';
+  assert.equal(applyManagerEmails('employee', 'Rose.Mukeshimana@azultech.rw', list), 'manager');
+  assert.equal(applyManagerEmails('employee', 'someone@azultech.rw', list), 'employee');
+  assert.equal(applyManagerEmails('hr', 'rose.mukeshimana@azultech.rw', list), 'hr');
+});
