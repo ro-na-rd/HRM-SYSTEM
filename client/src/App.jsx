@@ -12,7 +12,6 @@ import Profile from './pages/Profile';
 import MyDocuments from './pages/MyDocuments';
 import MyPayslips from './pages/MyPayslips';
 import MyPerformance from './pages/MyPerformance';
-import MyAttendance from './pages/MyAttendance';
 import MyNotifications from './pages/MyNotifications';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import Compensation from './pages/Compensation';
@@ -20,6 +19,10 @@ import Performance from './pages/Performance';
 import Attendance from './pages/Attendance';
 import Reports from './pages/Reports';
 import ComingSoon from './pages/ComingSoon';
+import ManagerDashboard from './pages/manager/ManagerDashboard';
+import ManagerEmployees from './pages/manager/ManagerEmployees';
+import ManagerAttendance from './pages/manager/ManagerAttendance';
+import ManagerLeave from './pages/manager/ManagerLeave';
 import { RecruitmentIcon, TrainingIcon, SettingsIcon } from './components/Icons';
 
 function ProtectedRoute({ roles, children }) {
@@ -34,10 +37,16 @@ function HomeRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={user.role === 'employee' ? '/employee-dashboard' : '/dashboard'} replace />;
+  return <Navigate to={homePathFor(user.role)} replace />;
 }
 
 const STAFF_ROLES = ['admin', 'hr'];
+
+export function homePathFor(role) {
+  if (role === 'employee') return '/employee-dashboard';
+  if (role === 'manager') return '/manager';
+  return '/dashboard';
+}
 
 export default function App() {
   return (
@@ -181,10 +190,34 @@ export default function App() {
         }
       />
       <Route
-        path="/profile/attendance"
+        path="/manager"
         element={
-          <ProtectedRoute roles={['employee']}>
-            <MyAttendance />
+          <ProtectedRoute roles={['manager']}>
+            <ManagerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager/employees"
+        element={
+          <ProtectedRoute roles={['manager']}>
+            <ManagerEmployees />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager/attendance"
+        element={
+          <ProtectedRoute roles={['manager']}>
+            <ManagerAttendance />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager/leave"
+        element={
+          <ProtectedRoute roles={['manager']}>
+            <ManagerLeave />
           </ProtectedRoute>
         }
       />

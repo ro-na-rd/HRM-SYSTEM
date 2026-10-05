@@ -27,6 +27,7 @@ const performanceRoutes = require('./routes/performance');
 const attendanceRoutes = require('./routes/attendance');
 const reportRoutes = require('./routes/reports');
 const notificationRoutes = require('./routes/notifications');
+const managerRoutes = require('./routes/manager');
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -67,6 +68,7 @@ app.use('/api/performance', performanceRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/manager', managerRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

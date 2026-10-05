@@ -168,7 +168,7 @@ router.get('/:id/attachment', (req, res) => {
     return res.status(404).json({ error: 'No attachment on this letter' });
   }
 
-  if (req.user.role === 'employee') {
+  if (req.user.role !== 'admin' && req.user.role !== 'hr') {
     const employeeId = findOwnEmployeeId(req.user.id);
     if (!employeeId || letter.employee_id !== employeeId) {
       return res.status(403).json({ error: 'You do not have permission to view this' });

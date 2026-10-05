@@ -13,7 +13,12 @@ const { requireAuth } = require('../middleware/auth');
 const { encryptBuffer, decryptBuffer } = require('../lib/crypto');
 const { writeAuditLog } = require('../lib/audit');
 const { ssoEnabled, getClient, getRedirectUris, getPrimaryRedirectUri } = require('../lib/keycloakClient');
-const { extractGroupsFromClaims, resolveSsoRoleFromGroups, DEFAULT_SSO_ROLE } = require('../lib/ssoRoleMap');
+const {
+  extractGroupsFromClaims,
+  resolveSsoRoleFromGroups,
+  applyManagerEmails,
+  DEFAULT_SSO_ROLE,
+} = require('../lib/ssoRoleMap');
 
 const router = express.Router();
 const storageDir = path.join(__dirname, '..', '..', 'storage');
@@ -329,7 +334,7 @@ router.get('/sso/callback', async (req, res) => {
     // in through SSO — so it's a random value satisfying the NOT NULL
     // column, not a credential anyone needs to know.
     const password_hash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 12);
-    const baseRole = mappedRole || DEFAULT_SSO_ROLE;
+    const baseRole = applyManagerEmails(mappedRole || DEFAULT_SSO_ROLE, email);
     const role = isBootstrapAdmin(email) ? 'admin' : baseRole;
     const info = db
       .prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
@@ -337,7 +342,7 @@ router.get('/sso/callback', async (req, res) => {
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
     writeAuditLog(user.id, 'user_created_via_sso', 'user', user.id, { email, role, groups, mappedRole });
   } else {
-    const nextRole = isBootstrapAdmin(email) ? 'admin' : mappedRole || DEFAULT_SSO_ROLE;
+    const nextRole = isBootstrapAdmin(email) ? 'admin' : applyManagerEmails(mappedRole || DEFAULT_SSO_ROLE, email);
     if (user.role !== nextRole) {
       db.prepare('UPDATE users SET role = ? WHERE id = ?').run(nextRole, user.id);
       writeAuditLog(user.id, 'user_role_synced_via_sso', 'user', user.id, {

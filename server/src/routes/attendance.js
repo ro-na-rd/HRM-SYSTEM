@@ -4,127 +4,42 @@ const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { writeAuditLog } = require('../lib/audit');
 const { notifyEmployee } = require('../lib/notify');
-const { findOrCreateOwnEmployeeId } = require('../lib/selfService');
 
 const router = express.Router();
-router.use(requireAuth);
-
-function findOwnEmployeeId(userId) {
-  return findOrCreateOwnEmployeeId(userId);
-}
-
-function isStaff(req) {
-  return req.user.role === 'admin' || req.user.role === 'hr';
-}
+// Attendance is recorded by HR/Admin only. Employees no longer clock in or
+// out themselves, and team managers use /api/manager for their own team.
+router.use(requireAuth, requireRole('admin', 'hr'));
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/; // HH:MM as entered by HR
 
-// HR: whole register, optionally filtered by a single day or a range.
-// Employee: only their own records.
+// Whole register, optionally filtered by a single day or a range.
 router.get('/', (req, res) => {
-  if (isStaff(req)) {
-    const { date, from, to } = req.query;
-    const where = [];
-    const params = [];
-    if (date && DATE_RE.test(date)) {
-      where.push('a.work_date = ?');
-      params.push(date);
-    } else {
-      if (from && DATE_RE.test(from)) {
-        where.push('a.work_date >= ?');
-        params.push(from);
-      }
-      if (to && DATE_RE.test(to)) {
-        where.push('a.work_date <= ?');
-        params.push(to);
-      }
-    }
-    const rows = db
-      .prepare(
-        `SELECT a.*, e.full_name AS employee_name, e.department
-         FROM attendance a JOIN employees e ON e.id = a.employee_id
-         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-         ORDER BY a.work_date DESC, e.full_name ASC`
-      )
-      .all(...params);
-    return res.json(rows);
-  }
-
-  const employeeId = findOwnEmployeeId(req.user.id);
-  if (!employeeId) return res.json([]);
-  const rows = db
-    .prepare('SELECT * FROM attendance WHERE employee_id = ? ORDER BY work_date DESC LIMIT 180')
-    .all(employeeId);
-  res.json(rows);
-});
-
-// Employee: today's own record (client passes its local date), for the
-// clock in / clock out button state.
-router.get('/today', (req, res) => {
-  const employeeId = findOwnEmployeeId(req.user.id);
-  if (!employeeId) return res.json(null);
-  const date = DATE_RE.test(req.query.date || '') ? req.query.date : new Date().toISOString().slice(0, 10);
-  res.json(db.prepare('SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?').get(employeeId, date) || null);
-});
-
-const clockSchema = z.object({ work_date: z.string().regex(DATE_RE, 'Bad date') });
-
-router.post('/clock-in', (req, res) => {
-  const employeeId = findOwnEmployeeId(req.user.id);
-  if (!employeeId) {
-    return res.status(400).json({ error: 'Your login isn’t linked to an employee record yet.' });
-  }
-  const parsed = clockSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
-  const { work_date } = parsed.data;
-
-  const existing = db
-    .prepare('SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?')
-    .get(employeeId, work_date);
-  if (existing && existing.clock_in) {
-    return res.status(409).json({ error: 'You have already clocked in today.' });
-  }
-
-  const now = new Date().toISOString();
-  if (existing) {
-    db.prepare(`UPDATE attendance SET clock_in = ?, status = 'present', updated_at = ? WHERE id = ?`).run(
-      now,
-      now,
-      existing.id
-    );
+  const { date, from, to } = req.query;
+  const where = [];
+  const params = [];
+  if (date && DATE_RE.test(date)) {
+    where.push('a.work_date = ?');
+    params.push(date);
   } else {
-    db.prepare(
-      `INSERT INTO attendance (employee_id, work_date, clock_in, status) VALUES (?, ?, ?, 'present')`
-    ).run(employeeId, work_date, now);
+    if (from && DATE_RE.test(from)) {
+      where.push('a.work_date >= ?');
+      params.push(from);
+    }
+    if (to && DATE_RE.test(to)) {
+      where.push('a.work_date <= ?');
+      params.push(to);
+    }
   }
-  writeAuditLog(req.user.id, 'attendance_clock_in', 'attendance', employeeId, { work_date });
-  res.json(db.prepare('SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?').get(employeeId, work_date));
-});
-
-router.post('/clock-out', (req, res) => {
-  const employeeId = findOwnEmployeeId(req.user.id);
-  if (!employeeId) {
-    return res.status(400).json({ error: 'Your login isn’t linked to an employee record yet.' });
-  }
-  const parsed = clockSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
-  const { work_date } = parsed.data;
-
-  const existing = db
-    .prepare('SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?')
-    .get(employeeId, work_date);
-  if (!existing || !existing.clock_in) {
-    return res.status(400).json({ error: 'Clock in first before clocking out.' });
-  }
-  if (existing.clock_out) {
-    return res.status(409).json({ error: 'You have already clocked out today.' });
-  }
-
-  const now = new Date().toISOString();
-  db.prepare('UPDATE attendance SET clock_out = ?, updated_at = ? WHERE id = ?').run(now, now, existing.id);
-  writeAuditLog(req.user.id, 'attendance_clock_out', 'attendance', employeeId, { work_date });
-  res.json(db.prepare('SELECT * FROM attendance WHERE id = ?').get(existing.id));
+  const rows = db
+    .prepare(
+      `SELECT a.*, e.full_name AS employee_name, e.department
+       FROM attendance a JOIN employees e ON e.id = a.employee_id
+       WHERE e.managed_by IS NULL ${where.length ? `AND ${where.join(' AND ')}` : ''}
+       ORDER BY a.work_date DESC, e.full_name ASC`
+    )
+    .all(...params);
+  res.json(rows);
 });
 
 // HR manual entry / correction. Times come in as HH:MM on work_date and
@@ -144,12 +59,12 @@ function toIso(workDate, hhmm) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-router.post('/', requireRole('admin', 'hr'), (req, res) => {
+router.post('/', (req, res) => {
   const parsed = manualSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const d = parsed.data;
 
-  const employee = db.prepare('SELECT id FROM employees WHERE id = ?').get(d.employee_id);
+  const employee = db.prepare('SELECT id FROM employees WHERE id = ? AND managed_by IS NULL').get(d.employee_id);
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
 
   const clockIn = toIso(d.work_date, d.clock_in);
@@ -173,16 +88,17 @@ router.post('/', requireRole('admin', 'hr'), (req, res) => {
     type: 'attendance',
     title: 'Attendance updated',
     body: `Your attendance for ${d.work_date} was set to ${d.status.replace('_', ' ')} by HR.`,
-    link: '/profile/attendance',
   });
   res.status(201).json(
     db.prepare('SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?').get(d.employee_id, d.work_date)
   );
 });
 
-router.delete('/:id', requireRole('admin', 'hr'), (req, res) => {
+router.delete('/:id', (req, res) => {
   const id = Number(req.params.id);
-  const row = db.prepare('SELECT * FROM attendance WHERE id = ?').get(id);
+  const row = db.prepare(
+    'SELECT a.* FROM attendance a JOIN employees e ON e.id = a.employee_id WHERE a.id = ? AND e.managed_by IS NULL'
+  ).get(id);
   if (!row) return res.status(404).json({ error: 'Record not found' });
   db.prepare('DELETE FROM attendance WHERE id = ?').run(id);
   writeAuditLog(req.user.id, 'attendance_deleted', 'attendance', row.employee_id, { work_date: row.work_date });

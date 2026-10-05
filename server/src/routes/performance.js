@@ -95,7 +95,7 @@ router.post('/reviews', requireRole('admin', 'hr'), (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const d = parsed.data;
 
-  const employee = db.prepare('SELECT id FROM employees WHERE id = ?').get(d.employee_id);
+  const employee = db.prepare('SELECT id FROM employees WHERE id = ? AND managed_by IS NULL').get(d.employee_id);
   if (!employee) return res.status(404).json({ error: 'Employee not found' });
 
   const info = db

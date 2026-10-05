@@ -16,14 +16,14 @@ router.get('/summary', (req, res) => {
          COUNT(*) AS total,
          SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) AS active,
          SUM(CASE WHEN active = 0 THEN 1 ELSE 0 END) AS inactive
-       FROM employees`
+       FROM employees WHERE managed_by IS NULL`
     )
     .get();
 
   const byDepartment = db
     .prepare(
       `SELECT COALESCE(NULLIF(TRIM(department), ''), 'Unassigned') AS department, COUNT(*) AS count
-       FROM employees WHERE active = 1
+       FROM employees WHERE active = 1 AND managed_by IS NULL
        GROUP BY department ORDER BY count DESC, department ASC`
     )
     .all();
@@ -35,7 +35,7 @@ router.get('/summary', (req, res) => {
          SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
          SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected,
          COUNT(*) AS total
-       FROM leave_requests`
+       FROM leave_requests WHERE employee_id IN (SELECT id FROM employees WHERE managed_by IS NULL)`
     )
     .get();
 
@@ -76,11 +76,13 @@ router.get('/summary', (req, res) => {
          SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) AS on_leave,
          SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) AS absent,
          COUNT(*) AS recorded
-       FROM attendance WHERE work_date = ?`
+       FROM attendance WHERE work_date = ?
+         AND employee_id IN (SELECT id FROM employees WHERE managed_by IS NULL)`
     )
     .get(today);
   const attendanceMonth = db
-    .prepare(`SELECT COUNT(*) AS records FROM attendance WHERE work_date LIKE ?`)
+    .prepare(`SELECT COUNT(*) AS records FROM attendance WHERE work_date LIKE ?
+       AND employee_id IN (SELECT id FROM employees WHERE managed_by IS NULL)`)
     .get(`${monthPrefix}-%`);
 
   const documents = db.prepare('SELECT COUNT(*) AS total FROM documents').get();
@@ -90,6 +92,7 @@ router.get('/summary', (req, res) => {
          COUNT(*) AS total,
          SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin,
          SUM(CASE WHEN role = 'hr' THEN 1 ELSE 0 END) AS hr,
+         SUM(CASE WHEN role = 'manager' THEN 1 ELSE 0 END) AS manager,
          SUM(CASE WHEN role = 'employee' THEN 1 ELSE 0 END) AS employee
        FROM users`
     )
@@ -124,6 +127,7 @@ router.get('/employees.csv', (req, res) => {
        FROM employees e
        LEFT JOIN employees m ON m.id = e.manager_id
        LEFT JOIN users u ON u.id = e.user_id
+       WHERE e.managed_by IS NULL
        ORDER BY e.full_name ASC`
     )
     .all();

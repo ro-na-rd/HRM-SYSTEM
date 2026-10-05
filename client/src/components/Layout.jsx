@@ -20,12 +20,15 @@ const TITLES = {
   '/profile/leave': 'Leave',
   '/profile/letters': 'Letters',
   '/profile/documents': 'My Documents',
-  '/profile/attendance': 'Attendance',
   '/profile/payslips': 'Payslips',
   '/profile/performance': 'Performance',
   '/profile/training': 'Training',
   '/profile/notifications': 'Notifications',
   '/profile/settings': 'Settings',
+  '/manager': 'Dashboard',
+  '/manager/employees': 'My Team',
+  '/manager/attendance': 'Team Attendance',
+  '/manager/leave': 'Leave Management',
 };
 
 export default function Layout({ children, title }) {
