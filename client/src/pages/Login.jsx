@@ -44,7 +44,9 @@ export default function Login() {
   function ssoLogin() {
     // Full page navigation, not a fetch — Keycloak's login page (and this
     // redirect back) only work as real top-level browser navigations.
-    window.location.href = '/api/auth/sso/login';
+    // Carries the Remember-me choice so the server mints a 30d session
+    // when ticked (12h otherwise).
+    window.location.href = `/api/auth/sso/login${remember ? '?remember=1' : ''}`;
   }
 
   async function handleSubmit(e) {
@@ -55,7 +57,7 @@ export default function Login() {
       if (ssoEnabled) {
         // Production: SSO-only, no password form is rendered in this mode —
         // this submit comes from the "Continue with Azul Tech SSO" button.
-        window.location.href = '/api/auth/sso/login';
+        window.location.href = `/api/auth/sso/login${remember ? '?remember=1' : ''}`;
         return;
       }
       // Local dev (SSO not configured): plain email/password sign-in so you
@@ -101,6 +103,14 @@ export default function Login() {
               <button type="submit" className="pill-submit" disabled={submitting}>
                 {submitting ? 'Redirecting...' : 'Continue with Azul Tech SSO'}
               </button>
+
+              <div className="login-options-row">
+                <label className="remember-checkbox">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+                  Keep me signed in
+                </label>
+              </div>
+              <p className="login-account-copy">Also tick “Keep me signed in” on the next screen so your sign-in lasts 30 days.</p>
 
               <p className="login-account-copy">Sign in with your @azultech.rw Azul Tech account.</p>
             </>

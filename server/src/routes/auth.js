@@ -237,7 +237,11 @@ router.get('/sso/login', async (req, res) => {
   // Short-lived, tamper-proof (signed with the same JWT_SECRET as sessions)
   // cookie to carry the PKCE verifier + state + chosen redirect URI across
   // the redirect to Keycloak and back — never trust query params alone.
-  const pkce = jwt.sign({ state, code_verifier, redirect_uri }, process.env.JWT_SECRET, { expiresIn: '10m' });
+  // Carries the HRM "Remember me" choice too, so the callback mints a 30d
+  // session when ticked, 12h otherwise (Keycloak's own checkbox on the next
+  // screen controls the SSO session separately — the user should tick both).
+  const rememberSso = req.query.remember === '1';
+  const pkce = jwt.sign({ state, code_verifier, redirect_uri, remember: rememberSso }, process.env.JWT_SECRET, { expiresIn: '10m' });
   res.cookie(SSO_STATE_COOKIE, pkce, {
     httpOnly: true,
     sameSite: 'lax',
@@ -356,9 +360,9 @@ router.get('/sso/callback', async (req, res) => {
     }
   }
 
-  setSessionCookie(res, user, { req });
+  setSessionCookie(res, user, { remember: pkce.remember === true, req });
   if (tokenSet.id_token) {
-    res.cookie(SSO_ID_TOKEN_COOKIE, encodeIdToken(tokenSet.id_token), sessionCookieOptions(12 * 60 * 60 * 1000, req));
+    res.cookie(SSO_ID_TOKEN_COOKIE, encodeIdToken(tokenSet.id_token), sessionCookieOptions(pkce.remember === true ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000, req));
   }
   writeAuditLog(user.id, 'login_success_sso', 'user', user.id);
   // Land back on the frontend origin the login started from (:5173 in dev
